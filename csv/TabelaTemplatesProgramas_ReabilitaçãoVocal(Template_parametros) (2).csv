@@ -1,0 +1,9 @@
+;Nome do conteúdo ;Code;Modo de medição;Dispositivo;Dispositivo Code;Duração (dias);New;ShortDesc;Categoria;Categoria Code;Decimal;MinValue;MaxValue;Incremento;Unidad de medida;Chart Increment
+1;Saturação de oxigénio;PEROXYSAT;Automatica;Mola IHealth;IHEALTHOXIMETER;365;;;;;;;;;;
+2;Frequência cardíaca;HEARTRATE;Automatica;Mola IHealth;IHEALTHOXIMETER;365;;;;;;;;;;
+3;Reforço Hídrico ;WATERREINFORCE;Manual;;;365;Sim;Reforço Hídrico ;Composição corporal;COMPCORP;2;0;5000;10;ml;200
+;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;

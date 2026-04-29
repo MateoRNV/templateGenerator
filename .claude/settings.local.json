@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xxd \"C:/repos/templateGenerator/csv/TabelaTemplatesProgramas_ReabilitaçãoVocal\\(Programa\\).csv\")",
+      "Bash(xxd \"C:/repos/templateGenerator/csv/TabelaTemplatesProgramas_ReabilitaçãoVocal\\(Template_parametros\\) \\(2\\).csv\")",
+      "Bash(npm install:*)",
+      "Bash(npx tsx:*)",
+      "Bash(rm:*)"
+    ]
+  }
+}
