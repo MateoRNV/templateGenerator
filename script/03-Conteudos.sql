@@ -3,7 +3,7 @@ INSERT INTO [dbo].[TemplateEducationalContentItem] VALUES (
     ,(SELECT [Id] FROM [TemplateEducationalContentPlan] WHERE [ProgramCode] = 'VOCAL-REHAB') --planId
     ,'SV_PC_C1' --code
     ,'1' --itemNumber
-    ,1 --isOptional
+    ,1 --isActive
     );
 
 INSERT INTO [dbo].[TemplateEducationalContentItem] VALUES (
@@ -11,5 +11,5 @@ INSERT INTO [dbo].[TemplateEducationalContentItem] VALUES (
     ,(SELECT [Id] FROM [TemplateEducationalContentPlan] WHERE [ProgramCode] = 'VOCAL-REHAB') --planId
     ,'SV_PC_C2' --code
     ,'2' --itemNumber
-    ,1 --isOptional
+    ,1 --isActive
     );

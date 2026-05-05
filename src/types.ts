@@ -12,7 +12,23 @@ export interface TemplateParameter {
   deviceName: string;
   deviceCode: string;
   durationDays: number;
-  isNew: boolean;
+  isRecurring: boolean;
+}
+
+export interface WeekDaySchedule {
+  dayNumber: number;
+  times: string[];
+}
+
+export interface BiometricSchedule {
+  code: string;
+  periodCode: string;
+  weekDays: WeekDaySchedule[];
+}
+
+export interface NewParameter {
+  name: string;
+  code: string;
   shortDescription: string;
   category: string;
   categoryCode: string;
@@ -24,7 +40,27 @@ export interface TemplateParameter {
   chartIncrement: number | null;
 }
 
-export interface ContentPlanConfig {
+export interface NewExercise {
+  order: number;
+  code: string;
+  description: string;
+  shortDescription: string;
+  objective: string;
+  instructions: string;
+}
+
+export interface NewContent {
+  order: number;
+  title: string;
+  code: string;
+  category: string;
+  categoryCode: string;
+  description: string;
+  objective: string;
+}
+
+export interface ContentPlan {
+  description: string;
   durationDays: number;
   contentsPerDay: number;
 }
@@ -33,5 +69,6 @@ export interface EducationalContentItem {
   order: number;
   name: string;
   code: string;
-  isOptional: boolean;
+  planDescription: string;
+  isActive: boolean;
 }

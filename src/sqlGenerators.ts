@@ -1,4 +1,4 @@
-import type { ProgramData, TemplateParameter, ContentPlanConfig, EducationalContentItem } from "./types.js";
+import type { ProgramData, TemplateParameter, NewParameter, NewExercise, NewContent, BiometricSchedule, ContentPlan, EducationalContentItem } from "./types.js";
 
 function sqlString(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
@@ -50,10 +50,65 @@ VALUES
 );`;
 }
 
+// -- TemplateBiometricParameterPeriod INSERT ----------------------------------
+
+function tbpLookup(parameterCode: string, programCode: string): string {
+  return `(SELECT [Id] FROM [dbo].[TemplateBiometricParameter] WHERE [Code] = ${sqlString(parameterCode)} AND [TemplateId] = (SELECT [Id] FROM [dbo].[Template] WHERE [ProgramCode] = ${sqlString(programCode)}))`;
+}
+
+function generateBiometricPeriodInsert(
+  parameterCode: string,
+  periodCode: string,
+  programCode: string
+): string {
+  return `INSERT INTO [dbo].[TemplateBiometricParameterPeriod] ([Id] ,[Code] ,[TemplateBiometricParameterId] ,[IsActive])
+VALUES (
+    NEWID() --id
+    ,${sqlString(periodCode)} --code
+    ,${tbpLookup(parameterCode, programCode)} --templateBiometricParameterId
+    ,1 --isActive
+    );`;
+}
+
+// -- TemplateBiometricParameterWeekDay INSERT ---------------------------------
+
+function generateBiometricWeekDayInsert(
+  parameterCode: string,
+  dayNumber: number,
+  programCode: string
+): string {
+  return `INSERT INTO [dbo].[TemplateBiometricParameterWeekDay] ([Id] ,[TemplateBiometricParameterId] ,[DayNumber] ,[IsActive])
+VALUES (
+    NEWID() --id
+    ,${tbpLookup(parameterCode, programCode)} --templateBiometricParameterId
+    ,${dayNumber} --dayNumber
+    ,1 --isActive
+    );`;
+}
+
+// -- TemplateBiometricParameterWeekDayTimer INSERT ----------------------------
+
+function formatWeekDayStartTime(time: string): string {
+  return `'2026-01-01 ${time}:00.0000000 +00:00'`;
+}
+
+function generateBiometricWeekDayTimerInsert(
+  parameterCode: string,
+  dayNumber: number,
+  time: string,
+  programCode: string
+): string {
+  const tbpwLookup = `(SELECT [Id] FROM [TemplateBiometricParameterWeekDay] [TBPW] WHERE [TBPW].[DayNumber] = ${dayNumber} AND [TBPW].TemplateBiometricParameterId = ${tbpLookup(parameterCode, programCode)})`;
+  return `INSERT INTO [dbo].[TemplateBiometricParameterWeekDayTimer] ([Id] ,[TemplateBiometricParameterWeekDayId] ,[WeekDayStartTime] ,[IsActive])
+VALUES (
+    NEWID() --id
+    ,${tbpwLookup} ,${formatWeekDayStartTime(time)} ,1);`;
+}
+
 // -- ClinicalDataType INSERT (BP) ---------------------------------------------
 
 function generateClinicalDataTypeInsert(
-  param: TemplateParameter,
+  param: NewParameter,
   order: number
 ): string {
   const categoryLookup = param.categoryCode
@@ -95,7 +150,8 @@ VALUES (
 
 export function generateTemplateSql(
   program: ProgramData,
-  parameters: TemplateParameter[]
+  parameters: TemplateParameter[],
+  schedules: BiometricSchedule[]
 ): string {
   const lines: string[] = [
     `-- =============================================`,
@@ -105,9 +161,39 @@ export function generateTemplateSql(
     generateTemplateInsert(program),
   ];
 
+  const scheduleByCode = new Map(schedules.map((s) => [s.code, s]));
+
   for (const param of parameters) {
-    lines.push("", "GO");
+    lines.push("");
+    lines.push("");
+    lines.push(`-- =============================================`);
+    lines.push(`-- Biometric Parameters: ${param.name} (${param.code})`);
+    lines.push(`-- =============================================`);
+    lines.push("GO");
     lines.push(generateBiometricParameterInsert(param, program.code));
+
+    if (!param.isRecurring) continue;
+    const schedule = scheduleByCode.get(param.code);
+    if (!schedule) continue;
+
+    if (schedule.periodCode) {
+      lines.push("");
+      lines.push("--Periods");
+      lines.push(generateBiometricPeriodInsert(param.code, schedule.periodCode, program.code));
+    }
+
+    if (schedule.weekDays.length > 0) {
+      lines.push("");
+      lines.push("--Week days and hours");
+      for (const day of schedule.weekDays) {
+        lines.push(`--Day ${day.dayNumber} - ${day.times.join(" , ")}`);
+        lines.push(generateBiometricWeekDayInsert(param.code, day.dayNumber, program.code));
+        for (const time of day.times) {
+          lines.push(generateBiometricWeekDayTimerInsert(param.code, day.dayNumber, time, program.code));
+        }
+        lines.push("");
+      }
+    }
   }
 
   lines.push("");
@@ -115,10 +201,9 @@ export function generateTemplateSql(
 }
 
 export function generateBpSql(
-  parameters: TemplateParameter[]
+  newParameters: NewParameter[]
 ): string | null {
-  const newParams = parameters.filter((p) => p.isNew);
-  if (newParams.length === 0) return null;
+  if (newParameters.length === 0) return null;
 
   const lines: string[] = [
     `-- =============================================`,
@@ -126,9 +211,96 @@ export function generateBpSql(
     `-- =============================================`,
   ];
 
-  newParams.forEach((param, index) => {
+  newParameters.forEach((param, index) => {
     if (index > 0) lines.push("", "GO");
     lines.push("", generateClinicalDataTypeInsert(param, index + 1));
+  });
+
+  lines.push("", "GO", "");
+  return lines.join("\n");
+}
+
+// -- PRePhysicalExercise INSERT (Pre-rehabilitation exercise catalog) ---------
+
+function generatePreExerciseInsert(exercise: NewExercise): string {
+  return `INSERT INTO [dbo].[PRePhysicalExercise] ([Id], [Code], [Description], [ShortDescription], [Image], [ImagePath], [IsActive], [CreateBy], [CreateDateTime], [ModifyBy], [ModifyDateTime], [Order], [Objective], [Instructions], [ImageURL], [IconURL], [CreateDateTimeOld], [ModifyDateTimeOld])
+VALUES (
+    NEWID() -- id
+    ,${sqlString(exercise.code)} -- code
+    ,${sqlString(exercise.description)} -- description
+    ,${sqlString(exercise.shortDescription)} -- shortDescription
+    ,NULL -- image
+    ,NULL -- imagePath
+    ,1 -- isActive
+    ,'00000000-0000-0000-0000-000000000000' -- createBy
+    ,SYSDATETIME() -- createDateTime
+    ,'00000000-0000-0000-0000-000000000000' -- modifyBy
+    ,SYSDATETIME() -- modifyDateTime
+    ,${exercise.order} -- order
+    ,${exercise.objective ? sqlString(exercise.objective) : "NULL"} -- objective
+    ,${exercise.instructions ? sqlString(exercise.instructions) : "NULL"} -- instructions
+    ,NULL -- imageURL
+    ,NULL -- iconURL
+    ,NULL -- createDateTimeOld
+    ,NULL -- modifyDateTimeOld
+);`;
+}
+
+export function generatePreSql(exercises: NewExercise[]): string | null {
+  if (exercises.length === 0) return null;
+
+  const lines: string[] = [
+    `-- =============================================`,
+    `-- New Physical Exercises (PRePhysicalExercise)`,
+    `-- =============================================`,
+  ];
+
+  exercises.forEach((exercise, index) => {
+    if (index > 0) lines.push("", "GO");
+    lines.push("", generatePreExerciseInsert(exercise));
+  });
+
+  lines.push("", "GO", "");
+  return lines.join("\n");
+}
+
+// -- EducationalContent.[Item] INSERT (Educational content catalog) -----------
+
+function generateEducationalContentItemCatalogInsert(item: NewContent): string {
+  const categoryLookup = item.categoryCode
+    ? `(SELECT [Id] FROM [EducationalContent].[Category] WHERE [Code] = ${sqlString(item.categoryCode)})`
+    : "NULL";
+
+  return `INSERT INTO [EducationalContent].[Item] ([Id], [Title], [Code], [CategoryId], [Description], [ImageURL], [IsActive], [CreateDateTime], [ModifyDateTime], [Objective], [Order], [CreateDateTimeOld], [ModifyDateTimeOld])
+VALUES (
+    NEWID() -- Id
+    ,${sqlString(item.title)} -- Title
+    ,${sqlString(item.code)} -- Code
+    ,${categoryLookup} -- CategoryId
+    ,${item.description ? sqlString(item.description) : "NULL"} -- Description
+    ,NULL -- ImageURL
+    ,1 -- IsActive
+    ,SYSDATETIME() -- CreateDateTime
+    ,NULL -- ModifyDateTime
+    ,${item.objective ? sqlString(item.objective) : "NULL"} -- Objective
+    ,${item.order} -- Order
+    ,SYSDATETIME() -- CreateDateTimeOld
+    ,NULL -- ModifyDateTimeOld
+);`;
+}
+
+export function generateContentSql(items: NewContent[]): string | null {
+  if (items.length === 0) return null;
+
+  const lines: string[] = [
+    `-- =============================================`,
+    `-- New Educational Content Items (EducationalContent.Item)`,
+    `-- =============================================`,
+  ];
+
+  items.forEach((item, index) => {
+    if (index > 0) lines.push("", "GO");
+    lines.push("", generateEducationalContentItemCatalogInsert(item));
   });
 
   lines.push("", "GO", "");
@@ -139,14 +311,14 @@ export function generateBpSql(
 
 function generateEducationalContentPlanInsert(
   programCode: string,
-  config: ContentPlanConfig
+  plan: ContentPlan
 ): string {
   return `INSERT INTO [dbo].[TemplateEducationalContentPlan] ([Id] ,[TemplateId] ,[Description], [DurationInDays] ,[ContentPerDay] ,[IsOrderMandatory] ,[IsActive], [ProgramCode])
 VALUES (NEWID() --id
 , (SELECT [Id] FROM [Template] WHERE [ProgramCode] = ${sqlString(programCode)}) --templateId
-, 'Pack Standard ${programCode}' --description
- ,${config.durationDays} --durationInDays
- ,${config.contentsPerDay} --contentPerDay
+, ${sqlString(plan.description)} --description
+ ,${plan.durationDays} --durationInDays
+ ,${plan.contentsPerDay} --contentPerDay
  ,1 --isOrderMandatory
  ,1 --isActive
  , ${sqlString(programCode)} --programCode
@@ -159,12 +331,14 @@ function generateEducationalContentItemInsert(
   item: EducationalContentItem,
   programCode: string
 ): string {
+  const planLookup = `(SELECT [Id] FROM [TemplateEducationalContentPlan] WHERE [ProgramCode] = ${sqlString(programCode)} AND [Description] = ${sqlString(item.planDescription)})`;
+
   return `INSERT INTO [dbo].[TemplateEducationalContentItem] VALUES (
     NEWID() --id
-    ,(SELECT [Id] FROM [TemplateEducationalContentPlan] WHERE [ProgramCode] = ${sqlString(programCode)}) --planId
+    ,${planLookup} --planId
     ,${sqlString(item.code)} --code
     ,'${item.order}' --itemNumber
-    ,${item.isOptional ? 1 : 0} --isOptional
+    ,1 --isActive
     );`;
 }
 
@@ -172,16 +346,18 @@ function generateEducationalContentItemInsert(
 
 export function generateConteudosSql(
   programCode: string,
-  config: ContentPlanConfig,
+  plans: ContentPlan[],
   items: EducationalContentItem[]
 ): string {
   const lines: string[] = [
     `-- =============================================`,
-    `-- Educational Content Plan (${programCode})`,
+    `-- Educational Content Plans (${programCode})`,
     `-- =============================================`,
-    ``,
-    generateEducationalContentPlanInsert(programCode, config),
   ];
+
+  for (const plan of plans) {
+    lines.push("", generateEducationalContentPlanInsert(programCode, plan));
+  }
 
   for (const item of items) {
     lines.push("", generateEducationalContentItemInsert(item, programCode));

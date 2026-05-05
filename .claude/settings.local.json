@@ -5,7 +5,9 @@
       "Bash(xxd \"C:/repos/templateGenerator/csv/TabelaTemplatesProgramas_ReabilitaçãoVocal\\(Template_parametros\\) \\(2\\).csv\")",
       "Bash(npm install:*)",
       "Bash(npx tsx:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(npm run *)",
+      "PowerShell($files = Get-ChildItem C:\\\\repos\\\\templateGenerator\\\\csv -Force; $files | ForEach-Object { Write-Output \\(\"{0} | {1} bytes\" -f $_.Name, $_.Length\\) })"
     ]
   }
 }

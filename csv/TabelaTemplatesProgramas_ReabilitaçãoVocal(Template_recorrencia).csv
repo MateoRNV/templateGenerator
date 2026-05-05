@@ -1,0 +1,13 @@
+Programa;Tipo de prescri��o;Prescri��o;Code;Modo de medi��o;Dispositivo;Dispositivo code;Monitoriza��o recorrente;Dura��o;Configura��o datas e horas;Per�odo a monitorizar;Periodo code;Seg;Ter;Qua;Qui;Sex;Sab;Dom;Conteudos por dia 
+Reabilita��o Vocal;Par�metro biom�trico;Satura��o de oxig�nio;HEARTRATE;Autom�tica;Mola IHealth;IHEALTHOXIMETER;Sim;365;Todos os dias, 19h00;Durante o exercicio;DURING_EXERCISE;19:00/22:00;19:00;19:00;19:00;19:00;19:00;19:00;
+Reabilita��o Vocal;Par�metro biom�trico;Frequ�ncia card�aca;PEROXYSAT;Autom�tica;Mola IHealth;IHEALTHOXIMETER;Sim;365;Todos os dias, 19h00;Durante o exercicio;DURING_EXERCISE;19:00;19:00;19:00;19:00;19:00;19:00;19:00;
+Reabilita��o Vocal;Par�metro biom�trico;Refor�o hidr�co (Hidrata��o em mobile);WATERREINFORCE;Manual;;;Sim;365;Todos os dias, 20h00;Sem periodo definido;NOSCHEDULE;20:00;20:00;20:00;20:00;20:00;20:00;20:00;
+Reabilita��o Vocal;Question�rio (=2);Question�rio Abusos e maus usos vocais_Diario;;Manual;;;Sim;;Todos os dias 20h00;Sem periodo definido;NOSCHEDULE;20:00;20:00;20:00;20:00;20:00;20:00;20:00;
+Reabilita��o Vocal;Question�rio (=16);Question�rio Abusos e maus usos vocais_Semanal;;Manual;;;Sim;;Segundas 20h00;Sem periodo definido;NOSCHEDULE;20:00;20:00;20:00;20:00;20:00;20:00;20:00;
+Reabilita��o Vocal;Question�rio (=30);The Voice Handicap Index (VHI);;Manual;;;Sim;7;"Quinta 10H
+(durante 1 semana)";Sem periodo definido;NOSCHEDULE;;;;10:00;;;;
+Reabilita��o Vocal;Question�rio (=30);VoiSS;;Manual;;;Sim;7;"Quinta 10H
+(durante 1 semana)";Sem periodo definido;NOSCHEDULE;;;;10:00;;;;
+Reabilita��o Vocal;Exercicios (=20);Reabilita��o vocal;;Manual;;;Sim;182;Todos os dias �s 19h00;Sem periodo definido;NOSCHEDULE;19:00;19:00;19:00;19:00;19:00;19:00;19:00;
+Reabilita��o Vocal;Conte�dos (=34);Sa�de Vocal;;Manual;;;Sim;182;Todos os dias, 2 conteudos dia;Antes do exercicio;BEFORE_EXERCISE;X;X;X;X;X;X;X;2
+Reabilita��o Vocal;Conteudos;Teste;;;;;Sim ;365;;;;X;X;X;;;;;5
