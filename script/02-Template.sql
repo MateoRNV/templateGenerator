@@ -108,6 +108,8 @@ VALUES
     ,'IHEALTHOXIMETER' --AssessmentToolCode
 );
 
+----ETC ETC
+
 
 -- =============================================
 -- Biometric Parameters: Hidratación (WATERREINFORCE)
@@ -130,13 +132,145 @@ VALUES
 );
 
 
+----ETC ETC
+
+
+-- =============================================
+-- Exercicios: Reabilitação vocal
+-- =============================================
+INSERT INTO [dbo].[TemplatePhysicalRehabilitationPlan] ([Id] ,[TemplateId] ,[Description] ,[IsRecurringMonitoring] ,[DurationInDays] ,[NumberOccurrences] ,[StartTime] ,[EndTime] ,[ReceiveUnfulfilledAlerts] ,[IsActive] ,[ProgramCode]) 
+VALUES (
+    NEWID() --id
+    ,(SELECT [Id] FROM [dbo].[Template] WHERE [ProgramCode] = 'VOCAL-REHAB') --templateId
+    ,'Reabilitação vocal' --description
+    ,1 --isRecurringMonitoring
+    ,182 --durationInDays
+    ,NULL --numberOccurrences
+    ,NULL --StartTime
+    ,NULL --EndTime
+    ,0 --receiveUnfulfilledAlerts
+    ,1 --isActive
+    ,'VOCAL-REHAB' --programCode
+    );  
+
+--Periods
+INSERT INTO [dbo].[TemplatePhysicalRehabilitationPeriod] ([Id] ,[TemplatePhysicalRehabilitationPlanId] ,[PeriodCode] ,[IsActive]) 
+VALUES (NEWID() --id
+    ,(SELECT [Id] FROM [TemplatePhysicalRehabilitationPlan] WHERE [ProgramCode] = 'VOCAL-REHAB' AND [Description] = 'Reabilitação vocal') --templatePhysicalRehabilitationPlanId
+    ,'NOSCHEDULE' --periodCode
+    ,1 --isActive
+    );
+
+--Weekdays and hours
+--Day 1 - 19:00
+  INSERT INTO [dbo].[TemplatePhysicalRehabilitationWeekDay]
+  VALUES (
+    NEWID() --id
+    ,(SELECT [Id] FROM [TemplatePhysicalRehabilitationPlan] WHERE [ProgramCode] = 'VOCAL-REHAB' AND [Description] = 'Reabilitação vocal') --templatePhysicalRehabilitationPlanId
+    ,1 --dayNumber
+    ,1 --isActive
+  );
+  INSERT INTO [dbo].[TemplatePhysicalRehabilitationWeekDayTimer]
+  VALUES (
+    NEWID() --id
+    ,(SELECT [Id] FROM [TemplatePhysicalRehabilitationWeekDay] WHERE [ProgramCode] = 'VOCAL-REHAB' AND [Description] = 'Reabilitação vocal') --templatePhysicalRehabilitationWeekDayId
+    ,'2026-01-01 19:00:00.0000000 +00:00' --weekDayStartTime
+    ,NULL --weekDayEndTime
+    ,1 --isActive
+  );
+--Day 2 - 17:00/20:00
+--...etc
+
+-- =============================================
+-- Exercicios: Teste
+-- =============================================
+INSERT INTO [dbo].[TemplatePhysicalRehabilitationPlan] ([Id] ,[TemplateId] ,[Description] ,[IsRecurringMonitoring] ,[DurationInDays] ,[NumberOccurrences] ,[StartTime] ,[EndTime] ,[ReceiveUnfulfilledAlerts] ,[IsActive] ,[ProgramCode]) 
+VALUES (
+    NEWID() --id
+    ,(SELECT [Id] FROM [dbo].[Template] WHERE [ProgramCode] = 'VOCAL-REHAB') --templateId
+    ,'Teste' --description
+    ,1 --isRecurringMonitoring
+    ,182 --durationInDays
+    ,NULL --numberOccurrences
+    ,NULL --StartTime
+    ,NULL --EndTime
+    ,0 --receiveUnfulfilledAlerts
+    ,1 --isActive
+    ,'VOCAL-REHAB' --programCode
+    );  
+
+INSERT INTO [dbo].[TemplatePhysicalRehabilitationPeriod] ([Id] ,[TemplatePhysicalRehabilitationPlanId] ,[PeriodCode] ,[IsActive]) 
+VALUES (NEWID() --id
+    ,(SELECT [Id] FROM [TemplatePhysicalRehabilitationPlan] WHERE [ProgramCode] = 'VOCAL-REHAB' AND [Description] = 'Teste') --templatePhysicalRehabilitationPlanId
+    ,'BEFORE_EXERCISE' --periodCode
+    ,1 --isActive
+    );
+
+-- =============================================
+-- Educational Content Plans: Saúde Vocal
+-- =============================================
+
 INSERT INTO [dbo].[TemplateEducationalContentPlan] ([Id] ,[TemplateId] ,[Description], [DurationInDays] ,[ContentPerDay] ,[IsOrderMandatory] ,[IsActive], [ProgramCode])
 VALUES (NEWID() --id
 , (SELECT [Id] FROM [Template] WHERE [ProgramCode] = 'VOCAL-REHAB') --templateId
-, 'Pack Standard VOCAL-REHAB' --description
- ,365 --durationInDays
+, 'Saúde Vocal' --description
+ ,182 --durationInDays
  ,2 --contentPerDay
- ,0 --isOrderMandatory
+ ,1 --isOrderMandatory
  ,1 --isActive
- , 'VOCAL-REHAB' --programCode (el mismo que el programa recien creado)
+ , 'VOCAL-REHAB' --programCode
  );
+
+  INSERT INTO [dbo].[TemplateEducationalContentPeriod] ([Id] ,[TemplateEducationalContentPlanId] ,[IsActive] ,[PeriodCode]) 
+  VALUES (NEWID() --id
+    ,(SELECT [Id] FROM [TemplateEducationalContentPlan] WHERE [ProgramCode] = 'VOCAL-REHAB' AND [Description] = 'Saúde Vocal') --templateEducationalContentPlanId
+    ,1 --isActive
+    ,'BEFORE_EXERCISE' --periodCode
+    );
+
+  INSERT INTO [dbo].[TemplateEducationalContentWeekDay] ([Id] ,[TemplateEducationalContentPlanId] ,[DayNumber] ,[IsActive]) 
+  VALUES (NEWID() --id
+    ,(SELECT [Id] FROM [TemplateEducationalContentXPlan] WHERE [ProgramCode] = 'VOCAL-REHAB' AND [Description] = 'Saúde Vocal') --templateEducationalContentPlanId
+    ,2 --dayNumber
+    ,1 --isActive
+    );
+
+  INSERT INTO [dbo].[TemplateEducationalContentWeekDay] ([Id] ,[TemplateEducationalContentPlanId] ,[DayNumber] ,[IsActive]) 
+  VALUES (NEWID() --id
+    ,(SELECT [Id] FROM [TemplateEducationalContentXPlan] WHERE [ProgramCode] = 'VOCAL-REHAB' AND [Description] = 'Saúde Vocal') --templateEducationalContentPlanId
+    ,3 --dayNumber
+    ,1 --isActive
+    );
+
+  INSERT INTO [dbo].[TemplateEducationalContentWeekDay] ([Id] ,[TemplateEducationalContentPlanId] ,[DayNumber] ,[IsActive]) 
+  VALUES (NEWID() --id
+    ,(SELECT [Id] FROM [TemplateEducationalContentXPlan] WHERE [ProgramCode] = 'VOCAL-REHAB' AND [Description] = 'Saúde Vocal') --templateEducationalContentPlanId
+    ,4 --dayNumber
+    ,1 --isActive
+    );
+
+  INSERT INTO [dbo].[TemplateEducationalContentWeekDay] ([Id] ,[TemplateEducationalContentPlanId] ,[DayNumber] ,[IsActive]) 
+  VALUES (NEWID() --id
+    ,(SELECT [Id] FROM [TemplateEducationalContentXPlan] WHERE [ProgramCode] = 'VOCAL-REHAB' AND [Description] = 'Saúde Vocal') --templateEducationalContentPlanId
+    ,5 --dayNumber
+    ,1 --isActive
+    );
+    ---etc etc
+
+-- =============================================
+-- Educational Content Plans: Teste
+-- =============================================
+
+INSERT INTO [dbo].[TemplateEducationalContentPlan] ([Id] ,[TemplateId] ,[Description], [DurationInDays] ,[ContentPerDay] ,[IsOrderMandatory] ,[IsActive], [ProgramCode])
+VALUES (NEWID() --id
+, (SELECT [Id] FROM [Template] WHERE [ProgramCode] = 'VOCAL-REHAB') --templateId
+, 'Teste' --description
+ ,365 --durationInDays
+ ,5 --contentPerDay
+ ,1 --isOrderMandatory
+ ,1 --isActive
+ , 'VOCAL-REHAB' --programCode
+ );
+
+  INSERT INTO [dbo].[TemplateEducationalContentWeekDay] ([Id] ,[TemplateEducationalContentPlanId] ,[DayNumber] ,[IsActive]) 
+  ---...  etc etc 
