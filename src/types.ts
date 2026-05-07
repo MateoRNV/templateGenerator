@@ -74,6 +74,13 @@ export interface ExercisePlan {
   weekDays: WeekDaySchedule[];
 }
 
+export interface QuestionnaireSchedule {
+  description: string;
+  durationDays: number;
+  periodCode: string;
+  weekDays: WeekDaySchedule[];
+}
+
 export interface EducationalContentItem {
   order: number;
   name: string;
@@ -82,12 +89,18 @@ export interface EducationalContentItem {
   isActive: boolean;
 }
 
+export interface ItemParameter {
+  code: string;
+  value: number;
+}
+
 export interface TemplateExerciseItem {
   order: number;
   name: string;
   code: string;
   instructions: string;
   planDescription: string;
+  parameters: ItemParameter[];
 }
 
 export interface AnswerKey {

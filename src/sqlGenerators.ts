@@ -1,4 +1,4 @@
-import type { ProgramData, TemplateParameter, NewParameter, NewExercise, NewContent, BiometricSchedule, ContentPlan, ExercisePlan, EducationalContentItem, TemplateExerciseItem, AnswerKey, PredefinedQuestion, PredefinedQuestionnaire } from "./types.js";
+import type { ProgramData, TemplateParameter, NewParameter, NewExercise, NewContent, BiometricSchedule, ContentPlan, ExercisePlan, EducationalContentItem, TemplateExerciseItem, AnswerKey, PredefinedQuestion, PredefinedQuestionnaire, QuestionnaireSchedule } from "./types.js";
 
 function sqlString(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
@@ -227,12 +227,119 @@ VALUES (
     );`;
 }
 
+// -- TemplateQuestionnaire + schedule -----------------------------------------
+
+function normalizeForMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/^questionario\s+/i, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function deriveQuestionnaireCode(description: string): string {
+  return description
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/^[Qq]uestion[aá]rio\s+/, "")
+    .replace(/[^A-Za-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toUpperCase();
+}
+
+interface ResolvedQuestionnaire {
+  code: string;
+  description: string;
+  schedule: QuestionnaireSchedule;
+}
+
+function resolveQuestionnaireSchedules(
+  schedules: QuestionnaireSchedule[],
+  predefined: PredefinedQuestionnaire[]
+): ResolvedQuestionnaire[] {
+  const byNorm = new Map<string, PredefinedQuestionnaire>();
+  for (const q of predefined) byNorm.set(normalizeForMatch(q.description), q);
+
+  return schedules.map((schedule) => {
+    const match = byNorm.get(normalizeForMatch(schedule.description));
+    if (match) {
+      return { code: match.code, description: match.description, schedule };
+    }
+    return {
+      code: deriveQuestionnaireCode(schedule.description),
+      description: schedule.description,
+      schedule,
+    };
+  });
+}
+
+function templateQuestionnaireLookup(programCode: string, code: string): string {
+  return `(SELECT [Id] FROM [TemplateQuestionnaire] WHERE [Code] = ${sqlString(code)} AND [TemplateId] = (SELECT [Id] FROM [dbo].[Template] WHERE [ProgramCode] = ${sqlString(programCode)}))`;
+}
+
+function generateTemplateQuestionnaireInsert(programCode: string, q: ResolvedQuestionnaire): string {
+  return `INSERT INTO [dbo].[TemplateQuestionnaire] ([Id] ,[Code] ,[Description] ,[TemplateQuestionnaireCategoryId] ,[StartTime] ,[IsRecurringMonitoring] ,[IsActive] ,[ProgramCode] ,[TemplateId] ,[ProfessionalQuestionnaireId] ,[DurationInDays] ,[NumberOccurences] ,[EndTime] ,[ReceiveUnfulfilledAlerts] ,[Migrated])
+VALUES (
+    NEWID() --id
+    ,${sqlString(q.code)} --code
+    ,${sqlString(q.description)} --description
+    ,NULL --templateQuestionnaireCategoryId
+    ,NULL --startTime
+    ,1 --isRecurringMonitoring
+    ,1 --isActive
+    ,${sqlString(programCode)} --programCode
+    ,(SELECT [Id] FROM [dbo].[Template] WHERE [ProgramCode] = ${sqlString(programCode)}) --templateId
+    ,NULL --professionalQuestionnaireId
+    ,${q.schedule.durationDays} --durationInDays
+    ,NULL --numberOccurences
+    ,NULL --endTime
+    ,0 --receiveUnfulfilledAlerts
+    ,0 --migrated
+);`;
+}
+
+function generateTemplateQuestionnairePeriodInsert(programCode: string, q: ResolvedQuestionnaire): string {
+  return `INSERT INTO [dbo].[TemplateQuestionnairePeriod] ([Id] ,[Code] ,[TemplateQuestionnaireId] ,[IsActive])
+VALUES (
+    NEWID() --id
+    ,${sqlString(q.schedule.periodCode)} --code
+    ,${templateQuestionnaireLookup(programCode, q.code)} --templateQuestionnaireId
+    ,1 --isActive
+);`;
+}
+
+function generateTemplateQuestionnaireWeekDayInsert(programCode: string, q: ResolvedQuestionnaire, dayNumber: number): string {
+  return `INSERT INTO [dbo].[TemplateQuestionnaireWeekDay] ([Id] ,[TemplateQuestionnaireId] ,[DayNumber] ,[IsActive])
+VALUES (
+    NEWID() --id
+    ,${templateQuestionnaireLookup(programCode, q.code)} --templateQuestionnaireId
+    ,${dayNumber} --dayNumber
+    ,1 --isActive
+);`;
+}
+
+function generateTemplateQuestionnaireWeekDayTimerInsert(programCode: string, q: ResolvedQuestionnaire, dayNumber: number, time: string): string {
+  const weekDayLookup = `(SELECT [Id] FROM [TemplateQuestionnaireWeekDay] WHERE [DayNumber] = ${dayNumber} AND [TemplateQuestionnaireId] = ${templateQuestionnaireLookup(programCode, q.code)})`;
+  return `INSERT INTO [dbo].[TemplateQuestionnaireWeekDayTimer] ([Id] ,[TemplateQuestionnaireWeekDayId] ,[WeekDayStartTime] ,[WeekDayEndTime] ,[IsActive])
+VALUES (
+    NEWID() --id
+    ,${weekDayLookup} --templateQuestionnaireWeekDayId
+    ,${formatWeekDayStartTime(time)} --weekDayStartTime
+    ,NULL --weekDayEndTime
+    ,1 --isActive
+);`;
+}
+
 // -- Public API ---------------------------------------------------------------
 
 export function generateTemplateSql(
   program: ProgramData,
   parameters: TemplateParameter[],
   schedules: BiometricSchedule[],
+  questionnaireSchedules: QuestionnaireSchedule[],
+  predefinedQuestionnaires: PredefinedQuestionnaire[],
   exercisePlans: ExercisePlan[],
   contentPlans: ContentPlan[]
 ): string {
@@ -273,6 +380,36 @@ export function generateTemplateSql(
         lines.push(generateBiometricWeekDayInsert(param.code, day.dayNumber, program.code));
         for (const time of day.times) {
           lines.push(generateBiometricWeekDayTimerInsert(param.code, day.dayNumber, time, program.code));
+        }
+        lines.push("");
+      }
+    }
+  }
+
+  const resolvedQuestionnaires = resolveQuestionnaireSchedules(questionnaireSchedules, predefinedQuestionnaires);
+  for (const q of resolvedQuestionnaires) {
+    lines.push("");
+    lines.push("");
+    lines.push(`-- =============================================`);
+    lines.push(`-- Questionarios: ${q.description}`);
+    lines.push(`-- =============================================`);
+    lines.push("GO");
+    lines.push(generateTemplateQuestionnaireInsert(program.code, q));
+
+    if (q.schedule.periodCode) {
+      lines.push("");
+      lines.push("--Periods");
+      lines.push(generateTemplateQuestionnairePeriodInsert(program.code, q));
+    }
+
+    if (q.schedule.weekDays.length > 0) {
+      lines.push("");
+      lines.push("--Week days and hours");
+      for (const day of q.schedule.weekDays) {
+        lines.push(`--Day ${day.dayNumber} - ${day.times.join(" , ")}`);
+        lines.push(generateTemplateQuestionnaireWeekDayInsert(program.code, q, day.dayNumber));
+        for (const time of day.times) {
+          lines.push(generateTemplateQuestionnaireWeekDayTimerInsert(program.code, q, day.dayNumber, time));
         }
         lines.push("");
       }
@@ -523,6 +660,60 @@ VALUES (
 );`;
 }
 
+// -- TemplatePhysicalRehabilitationItemParameter INSERT -----------------------
+
+function templateExerciseItemLookup(item: TemplateExerciseItem, programCode: string): string {
+  const planLookup = `(SELECT [Id] FROM [TemplatePhysicalRehabilitationPlan] WHERE [ProgramCode] = ${sqlString(programCode)} AND [Description] = ${sqlString(item.planDescription)})`;
+  return `(SELECT [Id] FROM [TemplatePhysicalRehabilitationItem] WHERE [Code] = ${sqlString(item.code)} AND [TemplatePhysicalRehabilitationPlanId] = ${planLookup})`;
+}
+
+function generateTemplateExerciseItemParameterInsert(item: TemplateExerciseItem, programCode: string, parameterCode: string, value: number): string {
+  return `INSERT INTO [dbo].[TemplatePhysicalRehabilitationItemParameter] ([Id] ,[TemplatePhysicalRehabilitationItemId] ,[ParameterCode] ,[Value] ,[Order] ,[IsActive])
+VALUES (
+    NEWID() --id
+    ,${templateExerciseItemLookup(item, programCode)} --templatePhysicalRehabilitationItemId
+    ,${sqlString(parameterCode)} --parameterCode
+    ,${value} --value
+    ,${item.order} --order
+    ,1 --isActive
+);`;
+}
+
+// -- 04-Exercicios-Parametros.sql ---------------------------------------------
+
+export function generateExerciciosParametrosSql(
+  programCode: string,
+  items: TemplateExerciseItem[]
+): string | null {
+  const itemsWithParams = items.filter((it) => it.parameters.length > 0);
+  if (itemsWithParams.length === 0) return null;
+
+  const lines: string[] = [
+    `-- =============================================`,
+    `-- Template Physical Rehabilitation Item Parameters (${programCode})`,
+    `-- =============================================`,
+  ];
+
+  let lastPlan = "";
+  for (const item of itemsWithParams) {
+    if (item.planDescription !== lastPlan) {
+      lines.push("");
+      lines.push(`-- =============================================`);
+      lines.push(`-- Exercicios: ${item.planDescription}`);
+      lines.push(`-- =============================================`);
+      lastPlan = item.planDescription;
+    }
+    lines.push("");
+    lines.push(`-- Item: ${item.code}`);
+    for (const p of item.parameters) {
+      lines.push(generateTemplateExerciseItemParameterInsert(item, programCode, p.code, p.value));
+    }
+  }
+
+  lines.push("");
+  return lines.join("\n");
+}
+
 // -- 04-Exercicios.sql --------------------------------------------------------
 
 export function generateExerciciosSql(
@@ -718,3 +909,4 @@ export function generateQuestSql(questionnaires: PredefinedQuestionnaire[]): str
 
   return lines.join("\n");
 }
+

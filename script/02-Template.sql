@@ -136,6 +136,62 @@ VALUES
 
 
 -- =============================================
+-- Questionarios: Abusos e Maus Usos Vocais - Diário
+-- =============================================
+  Insert into [TemplateQuestionnaire] ([Id] ,[Code] ,[Description] ,[TemplateQuestionnaireCategoryId] ,[StartTime] ,[IsRecurringMonitoring] ,[IsActive] ,[ProgramCode] ,[TemplateId] ,[ProfessionalQuestionnaireId] ,[DurationInDays] ,[NumberOccurences] ,[EndTime] ,[ReceiveUnfulfilledAlerts] ,[Migrated]) 
+  VALUES (
+    NEWID() --id
+    ,'Vocal_Abuse_Diary' --code
+    ,'Abusos e Maus Usos Vocais - Diário' --description
+    ,NULL --templateQuestionnaireCategoryId
+    ,NULL --startTime
+    ,1 --isRecurringMonitoring
+    ,1 --isActive
+    ,'VOCAL-REHAB' --programCode
+    ,(SELECT [Id] FROM [dbo].[Template] WHERE [ProgramCode] = 'VOCAL-REHAB') --templateId
+    ,NULL --professionalQuestionnaireId
+    ,182 --durationInDays
+    ,NULL --numberOccurences
+    ,NULL --endTime
+    ,0 --receiveUnfulfilledAlerts
+    ,0 --migrated
+  );
+  --Periods
+INSERT INTO [dbo].[TemplateQuestionnairePeriod] ([Id] ,[Code] ,[TemplateQuestionnaireId] ,[IsActive]) 
+VALUES (NEWID() --id
+    ,'UNDEFINED' --code
+    ,(SELECT [Id] FROM [TemplateQuestionnaire] WHERE [Code] = 'Vocal_Abuse_Diary') --templateQuestionnaireId
+    ,1 --isActive
+    );
+  
+--Weekdays and hours
+--Day 1 - 20:00
+  INSERT INTO [dbo].[TemplateQuestionnaireWeekDay]
+  VALUES (
+    NEWID() --id
+    ,(SELECT [Id] FROM [TemplateQuestionnaire] WHERE [Code] = 'Vocal_Abuse_Diary' AND [TemplateId] = (SELECT [Id] FROM [dbo].[Template] WHERE [ProgramCode] = 'VOCAL-REHAB')) --TemplateQuestionnaireId
+    ,1 --dayNumber
+    ,1 --isActive
+  );
+
+  INSERT INTO [dbo].[TemplateQuestionnaireWeekDayTimer]
+  VALUES (
+    NEWID() --id
+    ,(SELECT [Id] FROM [TemplateQuestionnaireWeekDay] [TQWD] WHERE [TQWD].[DayNumber] = 1 AND [TQWD].TemplateQuestionnaireId = (SELECT [Id] FROM [dbo].[TemplateQuestionnaire] WHERE [Code] = 'Vocal_Abuse_Diary' AND [TemplateId] = (SELECT [Id] FROM [dbo].[Template] WHERE [ProgramCode] = 'VOCAL-REHAB'))) --TemplateQuestionnaireWeekDayId
+    ,'2026-01-01 20:00:00.0000000 +00:00' --weekDayStartTime
+    ,NULL --weekDayEndTime
+    ,1 --isActive
+  );
+  ---resto de dias
+
+
+-- =============================================
+-- Questionarios: Abusos e Maus Usos Vocais - Diário
+-- =============================================
+
+
+
+-- =============================================
 -- Exercicios: Reabilitação vocal
 -- =============================================
 INSERT INTO [dbo].[TemplatePhysicalRehabilitationPlan] ([Id] ,[TemplateId] ,[Description] ,[IsRecurringMonitoring] ,[DurationInDays] ,[NumberOccurrences] ,[StartTime] ,[EndTime] ,[ReceiveUnfulfilledAlerts] ,[IsActive] ,[ProgramCode]) 

@@ -1,5 +1,5 @@
 import { readFileSync } from "fs";
-import type { ProgramData, TemplateParameter, NewParameter, NewExercise, NewContent, BiometricSchedule, WeekDaySchedule, ContentPlan, ExercisePlan, EducationalContentItem, TemplateExerciseItem, AnswerKey, PredefinedQuestion, PredefinedQuestionnaire } from "./types.js";
+import type { ProgramData, TemplateParameter, NewParameter, NewExercise, NewContent, BiometricSchedule, WeekDaySchedule, ContentPlan, ExercisePlan, EducationalContentItem, TemplateExerciseItem, AnswerKey, PredefinedQuestion, PredefinedQuestionnaire, QuestionnaireSchedule } from "./types.js";
 
 function parseNum(val: string): number | null {
   if (!val) return null;
@@ -180,6 +180,37 @@ export function parseBiometricSchedulesCsv(filePath: string): BiometricSchedule[
     schedules.push({
       code: row[3],
       periodCode: row[11] || "",
+      weekDays,
+    });
+  }
+
+  return schedules;
+}
+
+export function parseQuestionnaireSchedulesCsv(filePath: string): QuestionnaireSchedule[] {
+  const rows = readCsvFile(filePath);
+  // Rows whose Tipo de prescrição contains "questi" (Questionário/Questionario).
+  // Weekday cells are HH:MM (or HH:MM/HH:MM) timers, like biometric/exercise rows.
+
+  const timePattern = /^\d{1,2}:\d{2}$/;
+  const schedules: QuestionnaireSchedule[] = [];
+
+  for (const row of rows) {
+    if (!row[1] || !row[2]) continue;
+    if (!normalizeAccents(row[1]).includes("questi")) continue;
+
+    const weekDays: WeekDaySchedule[] = [];
+    for (let dayNumber = 1; dayNumber <= 7; dayNumber++) {
+      const cell = row[11 + dayNumber] || "";
+      const times = cell.split("/").map((t) => t.trim()).filter((t) => timePattern.test(t));
+      if (times.length === 0) continue;
+      weekDays.push({ dayNumber, times });
+    }
+
+    schedules.push({
+      description: row[2],
+      durationDays: Number(row[8]) || 365,
+      periodCode: (row[11] || "").trim(),
       weekDays,
     });
   }
@@ -444,6 +475,28 @@ function buildTemplateExerciseHeaderMap(headerRow: string[]): TemplateExerciseHe
   return map;
 }
 
+const PARAMETER_CODES = new Set(["SERIES", "ITERATION", "BREAK", "WEIGHT", "MINUTES"]);
+
+interface ParameterColumn {
+  index: number;
+  code: string;
+}
+
+function findParameterColumns(headerRow: string[]): ParameterColumn[] {
+  // Headers like "Séries - Series", "Pausa (hh:mm:ss) - BREAK". Take the segment after the
+  // last " - " and uppercase it; only keep columns whose suffix is a known parameter code.
+  const cols: ParameterColumn[] = [];
+  for (let i = 0; i < headerRow.length; i++) {
+    const cell = (headerRow[i] || "").trim();
+    const idx = cell.lastIndexOf(" - ");
+    if (idx === -1) continue;
+    const suffix = cell.slice(idx + 3).trim().toUpperCase();
+    if (!PARAMETER_CODES.has(suffix)) continue;
+    cols.push({ index: i, code: suffix });
+  }
+  return cols;
+}
+
 export function parseTemplatesExerciciosCsv(filePath: string): TemplateExerciseItem[] {
   const rows = readCsvFile(filePath);
   const header = findTemplateExerciseHeaderRow(rows);
@@ -456,6 +509,7 @@ export function parseTemplatesExerciciosCsv(filePath: string): TemplateExerciseI
     throw new Error(`Templates_exercicios CSV must include 'Nome' and 'Preplan' columns: ${filePath}`);
   }
 
+  const parameterCols = findParameterColumns(header.row);
   const items: TemplateExerciseItem[] = [];
 
   for (let i = header.index + 1; i < rows.length; i++) {
@@ -472,12 +526,22 @@ export function parseTemplatesExerciciosCsv(filePath: string): TemplateExerciseI
     const instructions = cols.instructions !== -1 ? collapseWhitespace(row[cols.instructions] || "") : "";
     const order = cols.order !== -1 ? Number(row[cols.order]) : NaN;
 
+    const parameters: { code: string; value: number }[] = [];
+    for (const pcol of parameterCols) {
+      const raw = (row[pcol.index] || "").trim();
+      if (!raw) continue;
+      const value = Number(raw);
+      if (!Number.isFinite(value)) continue;
+      parameters.push({ code: pcol.code, value });
+    }
+
     items.push({
       order: Number.isFinite(order) && order > 0 ? order : items.length + 1,
       name,
       code,
       instructions,
       planDescription,
+      parameters,
     });
   }
 

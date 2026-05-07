@@ -14,8 +14,9 @@ import {
   parseContentsCsv,
   parseTemplatesExerciciosCsv,
   parseNovosQuestionariosCsv,
+  parseQuestionnaireSchedulesCsv,
 } from "./csvParser.js";
-import { generateTemplateSql, generateBpSql, generatePreSql, generateContentSql, generateConteudosSql, generateExerciciosSql, generateQuestSql } from "./sqlGenerators.js";
+import { generateTemplateSql, generateBpSql, generatePreSql, generateContentSql, generateConteudosSql, generateExerciciosSql, generateExerciciosParametrosSql, generateQuestSql } from "./sqlGenerators.js";
 
 const CSV_DIR = join(import.meta.dirname, "..", "csv");
 const OUTPUT_DIR = join(import.meta.dirname, "..", "output");
@@ -315,14 +316,25 @@ function runFullGeneration(): void {
     const contentPlans = group.recorrenciaFile
       ? parseContentPlansCsv(group.recorrenciaFile)
       : [];
+    const questionnaireSchedules = group.recorrenciaFile
+      ? parseQuestionnaireSchedulesCsv(group.recorrenciaFile)
+      : [];
+
+    const predefinedQuestionnaires = questionarios.length > 0
+      ? parseNovosQuestionariosCsv(questionarios[0].novosQuestionariosFile)
+      : [];
 
     console.log(`  Program: ${program.name} (${program.code})`);
-    console.log(`  Parameters: ${parameters.length}, Schedules: ${schedules.length}, Exercise plans: ${exercisePlans.length}, Content plans: ${contentPlans.length}`);
+    console.log(`  Parameters: ${parameters.length}, Schedules: ${schedules.length}, Exercise plans: ${exercisePlans.length}, Content plans: ${contentPlans.length}, Questionnaire schedules: ${questionnaireSchedules.length}`);
+
+    if (!group.recorrenciaFile) {
+      console.log(`  ! Aviso: ficheiro Template_recorrencia não encontrado — agendamentos vazios`);
+    }
 
     if (group.novosParametrosFile) {
       writeBpSql(group.novosParametrosFile, group.label);
     } else {
-      console.log(`  -> 01-BP.sql skipped (no Novos_parametros CSV)`);
+      console.log(`  -> 01-BP.sql ignorado (ficheiro Novos_parametros não encontrado)`);
     }
 
     if (!questionariosEmitted) {
@@ -331,7 +343,7 @@ function runFullGeneration(): void {
         writeQuestSql(item.novosQuestionariosFile, item.label);
       }
       if (questionarios.length === 0) {
-        console.log(`  -> 01-Quest.sql skipped (no Novos_questionarios_predefinido CSV)`);
+        console.log(`  -> 01-Quest.sql ignorado (ficheiro Novos_questionarios_predefinido não encontrado)`);
       }
       questionariosEmitted = true;
     }
@@ -339,7 +351,7 @@ function runFullGeneration(): void {
     if (group.novosExerciciosFile) {
       writePreSql(group.novosExerciciosFile, group.label);
     } else {
-      console.log(`  -> 01-PRE.sql skipped (no Novos_exercicios CSV)`);
+      console.log(`  -> 01-PRE.sql ignorado (ficheiro Novos_exercicios não encontrado)`);
     }
 
     if (!conteudosEmitted) {
@@ -348,12 +360,12 @@ function runFullGeneration(): void {
         writeContentSql(item.novosConteudosFile, item.label);
       }
       if (conteudos.length === 0) {
-        console.log(`  -> 01-Content.sql skipped (no Novos_conteudos CSV)`);
+        console.log(`  -> 01-Content.sql ignorado (ficheiro Novos_conteudos não encontrado)`);
       }
       conteudosEmitted = true;
     }
 
-    const templateSql = generateTemplateSql(program, parameters, schedules, exercisePlans, contentPlans);
+    const templateSql = generateTemplateSql(program, parameters, schedules, questionnaireSchedules, predefinedQuestionnaires, exercisePlans, contentPlans);
     const templatePath = join(OUTPUT_DIR, `${group.label}_02-Template.sql`);
     writeFileSync(templatePath, templateSql, "utf-8");
     console.log(`  -> 02-Template.sql`);
@@ -367,7 +379,7 @@ function runFullGeneration(): void {
       writeFileSync(conteudosPath, conteudosSql, "utf-8");
       console.log(`  -> 03-Conteudos.sql`);
     } else {
-      console.log(`  -> 03-Conteudos.sql skipped (no Template_conteudos CSV)`);
+      console.log(`  -> 03-Conteudos.sql ignorado (ficheiro Template_conteudos não encontrado)`);
     }
 
     if (group.templatesExerciciosFile) {
@@ -378,8 +390,19 @@ function runFullGeneration(): void {
       const exerciciosPath = join(OUTPUT_DIR, `${group.label}_04-Exercicios.sql`);
       writeFileSync(exerciciosPath, exerciciosSql, "utf-8");
       console.log(`  -> 04-Exercicios.sql`);
+
+      const parametrosSql = generateExerciciosParametrosSql(program.code, exerciseItems);
+      if (parametrosSql) {
+        const parametrosPath = join(OUTPUT_DIR, `${group.label}_04-Exercicios-Parametros.sql`);
+        writeFileSync(parametrosPath, parametrosSql, "utf-8");
+        const totalParams = exerciseItems.reduce((acc, it) => acc + it.parameters.length, 0);
+        console.log(`  -> 04-Exercicios-Parametros.sql (${totalParams} parâmetro(s))`);
+      } else {
+        console.log(`  -> 04-Exercicios-Parametros.sql ignorado (não foram encontrados valores de parâmetros)`);
+      }
     } else {
-      console.log(`  -> 04-Exercicios.sql skipped (no Templates_exercicios CSV)`);
+      console.log(`  -> 04-Exercicios.sql ignorado (ficheiro Templates_exercicios não encontrado)`);
+      console.log(`  -> 04-Exercicios-Parametros.sql ignorado (ficheiro Templates_exercicios não encontrado)`);
     }
   }
 
