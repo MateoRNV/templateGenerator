@@ -1,5 +1,5 @@
 import { readFileSync } from "fs";
-import type { ProgramData, TemplateParameter, NewParameter, NewExercise, NewContent, BiometricSchedule, WeekDaySchedule, ContentPlan, EducationalContentItem } from "./types.js";
+import type { ProgramData, TemplateParameter, NewParameter, NewExercise, NewContent, BiometricSchedule, WeekDaySchedule, ContentPlan, ExercisePlan, EducationalContentItem, TemplateExerciseItem, AnswerKey, PredefinedQuestion, PredefinedQuestionnaire } from "./types.js";
 
 function parseNum(val: string): number | null {
   if (!val) return null;
@@ -343,8 +343,9 @@ export function parseNovosConteudosCsv(filePath: string): NewContent[] {
 
 export function parseContentPlansCsv(filePath: string): ContentPlan[] {
   const rows = readCsvFile(filePath);
-  // Recorrencia headers: Programa;Tipo de prescrição;Prescrição;Code;Modo de medição;Dispositivo;Dispositivo code;Monitorização recorrente;Duração;Configuração datas e horas;Período a monitorizar;Seg;Ter;Qua;Qui;Sex;Sab;Dom;Conteudos por dia
+  // Recorrencia headers: Programa;Tipo de prescrição;Prescrição;Code;Modo de medição;Dispositivo;Dispositivo code;Monitorização recorrente;Duração;Configuração datas e horas;Período a monitorizar;Periodo code;Seg;Ter;Qua;Qui;Sex;Sab;Dom;Conteudos por dia
   // Plans come from rows whose Tipo de prescrição starts with "Conteúdos" / "Conteudos".
+  // Weekday cells are markers (e.g. "X") indicating the day is active — no times for content plans.
 
   const plans: ContentPlan[] = [];
 
@@ -352,14 +353,208 @@ export function parseContentPlansCsv(filePath: string): ContentPlan[] {
     if (!row[1] || !row[2]) continue;
     if (!normalizeAccents(row[1]).includes("conte")) continue;
 
+    const activeDays: number[] = [];
+    for (let dayNumber = 1; dayNumber <= 7; dayNumber++) {
+      const cell = (row[11 + dayNumber] || "").trim();
+      if (cell.length > 0) activeDays.push(dayNumber);
+    }
+
     plans.push({
       description: row[2],
       durationDays: Number(row[8]) || 365,
       contentsPerDay: Number(row[19]) || 1,
+      periodCode: (row[11] || "").trim(),
+      activeDays,
     });
   }
 
   return plans;
+}
+
+export function parseExercisePlansCsv(filePath: string): ExercisePlan[] {
+  const rows = readCsvFile(filePath);
+  // Plans come from rows whose Tipo de prescrição contains "exerc".
+  // Weekday cells are HH:MM (or HH:MM/HH:MM) timers, like biometric rows.
+
+  const timePattern = /^\d{1,2}:\d{2}$/;
+  const plans: ExercisePlan[] = [];
+
+  for (const row of rows) {
+    if (!row[1] || !row[2]) continue;
+    if (!normalizeAccents(row[1]).includes("exerc")) continue;
+
+    const weekDays: WeekDaySchedule[] = [];
+    for (let dayNumber = 1; dayNumber <= 7; dayNumber++) {
+      const cell = row[11 + dayNumber] || "";
+      const times = cell.split("/").map((t) => t.trim()).filter((t) => timePattern.test(t));
+      if (times.length === 0) continue;
+      weekDays.push({ dayNumber, times });
+    }
+
+    plans.push({
+      description: row[2],
+      durationDays: Number(row[8]) || 365,
+      periodCode: (row[11] || "").trim(),
+      weekDays,
+    });
+  }
+
+  return plans;
+}
+
+interface TemplateExerciseHeaderMap {
+  order: number;
+  name: number;
+  code: number;
+  instructions: number;
+  preplan: number;
+}
+
+function findTemplateExerciseHeaderRow(rows: string[][]): { row: string[]; index: number } | null {
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    let hasName = false;
+    let hasPreplan = false;
+    for (const cell of row) {
+      const norm = normalizeAccents(cell);
+      if (norm.startsWith("nome")) hasName = true;
+      if (norm.startsWith("preplan")) hasPreplan = true;
+    }
+    if (hasName && hasPreplan) return { row, index: i };
+  }
+  return null;
+}
+
+function buildTemplateExerciseHeaderMap(headerRow: string[]): TemplateExerciseHeaderMap {
+  const map: TemplateExerciseHeaderMap = { order: -1, name: -1, code: -1, instructions: -1, preplan: -1 };
+  for (let i = 0; i < headerRow.length; i++) {
+    const norm = normalizeAccents(headerRow[i]);
+    if (norm === "order" || norm === "ordem") {
+      map.order = i;
+    } else if (norm.startsWith("nome do exercicio") || norm === "nome" || norm === "name") {
+      if (map.name === -1) map.name = i;
+    } else if (norm === "code" || norm === "codigo") {
+      map.code = i;
+    } else if (norm.startsWith("instruc") || norm.startsWith("instruct")) {
+      map.instructions = i;
+    } else if (norm.startsWith("preplan")) {
+      map.preplan = i;
+    }
+  }
+  return map;
+}
+
+export function parseTemplatesExerciciosCsv(filePath: string): TemplateExerciseItem[] {
+  const rows = readCsvFile(filePath);
+  const header = findTemplateExerciseHeaderRow(rows);
+  if (!header) {
+    throw new Error(`Could not find header row (Nome + Preplan) in: ${filePath}`);
+  }
+
+  const cols = buildTemplateExerciseHeaderMap(header.row);
+  if (cols.name === -1 || cols.preplan === -1) {
+    throw new Error(`Templates_exercicios CSV must include 'Nome' and 'Preplan' columns: ${filePath}`);
+  }
+
+  const items: TemplateExerciseItem[] = [];
+
+  for (let i = header.index + 1; i < rows.length; i++) {
+    const row = rows[i];
+    const name = collapseWhitespace(row[cols.name] || "");
+    if (!name) continue;
+
+    const planDescription = collapseWhitespace(row[cols.preplan] || "");
+    if (!planDescription) continue;
+
+    const csvCode = cols.code !== -1 ? collapseWhitespace(row[cols.code] || "") : "";
+    const code = csvCode || deriveCodeFromName(name);
+
+    const instructions = cols.instructions !== -1 ? collapseWhitespace(row[cols.instructions] || "") : "";
+    const order = cols.order !== -1 ? Number(row[cols.order]) : NaN;
+
+    items.push({
+      order: Number.isFinite(order) && order > 0 ? order : items.length + 1,
+      name,
+      code,
+      instructions,
+      planDescription,
+    });
+  }
+
+  return items;
+}
+
+function parseAnswerKeys(text: string): AnswerKey[] {
+  if (!text) return [];
+  const lines = text
+    .split(/\r?\n/)
+    .map((s) => s.trim().replace(/,$/, "").trim())
+    .filter(Boolean);
+
+  const keys: AnswerKey[] = [];
+  for (const line of lines) {
+    const parts = line.split(/\s*-\s*/);
+    if (parts.length < 3) continue;
+    const value = Number(parts[0]);
+    if (!Number.isFinite(value)) continue;
+    const code = parts[parts.length - 1].trim();
+    const description = parts.slice(1, -1).join(" - ").trim();
+    if (!code || !description) continue;
+    keys.push({ value, description, code });
+  }
+  return keys;
+}
+
+function parseBoolish(value: string): boolean {
+  const norm = normalizeAccents(value);
+  return norm === "sim" || norm === "true" || norm === "1" || norm === "yes";
+}
+
+export function parseNovosQuestionariosCsv(filePath: string): PredefinedQuestionnaire[] {
+  const rows = readCsvFile(filePath);
+  // Header row 0: 22 columns. Key indices used:
+  //  1=Questionario, 2=Code Questionario, 3=Instrução, 5=Título questão, 7=Description Questao,
+  //  8=Code Questão, 9=Ordem Questão, 10=Instrução questão, 12=QuestionNumber QuestionnaireQuestion,
+  //  14=Chaves de resposta, 15=Chaves de resposta New, 17=Tipo, 18=Score mínimo, 19=Score máximo,
+  //  21=Ad-hoc.
+
+  const byCode = new Map<string, PredefinedQuestionnaire>();
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const questionnaireCode = collapseWhitespace(row[2] || "");
+    const questionCode = collapseWhitespace(row[8] || "");
+    if (!questionnaireCode || !questionCode) continue;
+
+    let q = byCode.get(questionnaireCode);
+    if (!q) {
+      q = {
+        description: collapseWhitespace(row[1] || ""),
+        code: questionnaireCode,
+        instructions: collapseWhitespace(row[3] || ""),
+        questions: [],
+      };
+      byCode.set(questionnaireCode, q);
+    }
+
+    const useInCustom = parseNum(row[21]);
+    q.questions.push({
+      title: collapseWhitespace(row[5] || ""),
+      description: collapseWhitespace(row[7] || ""),
+      code: questionCode,
+      order: parseNum(row[9]),
+      instructions: collapseWhitespace(row[10] || ""),
+      questionNumber: collapseWhitespace(row[12] || ""),
+      responseKeyType: collapseWhitespace(row[17] || "").toUpperCase(),
+      minValue: parseNum(row[18]),
+      maxValue: parseNum(row[19]),
+      useInCustomQuestionnaire: useInCustom != null ? useInCustom : 0,
+      answerKeys: parseAnswerKeys(row[14] || ""),
+      newAnswerKeys: parseBoolish(row[15] || ""),
+    });
+  }
+
+  return Array.from(byCode.values());
 }
 
 export function parseContentsCsv(filePath: string): EducationalContentItem[] {

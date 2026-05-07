@@ -1,0 +1,14 @@
+Programa,Tipo de prescrição,Prescrição,Code,Modo de medição,Dispositivo,Dispositivo code,Monitorização recorrente,Duração,Configuração datas e horas,Período a monitorizar,Periodo code,Seg,Ter,Qua,Qui,Sex,Sab,Dom,Conteudos por dia 
+Reabilitação Vocal,Parâmetro biométrico,Saturação de oxigénio,HEARTRATE,Automática,Mola IHealth,IHEALTHOXIMETER,Sim,365,"Todos os dias, 19h00",Durante o exercicio,DURING_EXERCISE,19:00,19:00,19:00,19:00,19:00,19:00,19:00,
+Reabilitação Vocal,Parâmetro biométrico,Frequência cardíaca,PEROXYSAT,Automática,Mola IHealth,IHEALTHOXIMETER,Sim,365,"Todos os dias, 19h00",Durante o exercicio,DURING_EXERCISE,19:00,19:00,19:00,19:00,19:00,19:00,19:00,
+Reabilitação Vocal,Parâmetro biométrico,Reforço hidríco (Hidratação em mobile),WATERREINFORCE,Manual,,,Sim,365,"Todos os dias, 20h00",Sem periodo definido,NOSCHEDULE,20:00,20:00,20:00,20:00,20:00,20:00,20:00,
+Reabilitação Vocal,Questionário (=2),Questionário Abusos e maus usos vocais_Diario,,Manual,,,Sim,,Todos os dias 20h00,Sem periodo definido,NOSCHEDULE,20:00,20:00,20:00,20:00,20:00,20:00,20:00,
+Reabilitação Vocal,Questionário (=16),Questionário Abusos e maus usos vocais_Semanal,,Manual,,,Sim,,Segundas 20h00,Sem periodo definido,NOSCHEDULE,20:00,20:00,20:00,20:00,20:00,20:00,20:00,
+Reabilitação Vocal,Questionário (=30),The Voice Handicap Index (VHI),,Manual,,,Sim,7,"Quinta 10H
+(durante 1 semana)",Sem periodo definido,NOSCHEDULE,,,,10:00,,,,
+Reabilitação Vocal,Questionário (=30),VoiSS,,Manual,,,Sim,7,"Quinta 10H
+(durante 1 semana)",Sem periodo definido,NOSCHEDULE,,,,10:00,,,,
+Reabilitação Vocal,Exercicios (=20),Reabilitação vocal,,Manual,,,Sim,182,Todos os dias às 19h00,Sem periodo definido,NOSCHEDULE,19:00,19:00,19:00,19:00,19:00,19:00,19:00,
+Reabilitação Vocal,Exercicios (=1),Teste,,,,,Sim ,365,,Antes do exercicio,BEFORE_EXERCISE,,,15:00/22:00,,,,,
+Reabilitação Vocal,Conteúdos (=34),Saúde Vocal,,Manual,,,Sim,182,"Todos os dias, 2 conteudos dia",Antes do exercicio,BEFORE_EXERCISE,X,X,X,X,X,X,X,2
+Reabilitação Vocal,Conteudos,Teste,,,,,Sim ,365,,Sem periodo definido,NOSCHEDULE,,,X,,,,,5

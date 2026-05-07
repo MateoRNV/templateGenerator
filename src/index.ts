@@ -10,9 +10,12 @@ import {
   parseNovosConteudosCsv,
   parseBiometricSchedulesCsv,
   parseContentPlansCsv,
+  parseExercisePlansCsv,
   parseContentsCsv,
+  parseTemplatesExerciciosCsv,
+  parseNovosQuestionariosCsv,
 } from "./csvParser.js";
-import { generateTemplateSql, generateBpSql, generatePreSql, generateContentSql, generateConteudosSql } from "./sqlGenerators.js";
+import { generateTemplateSql, generateBpSql, generatePreSql, generateContentSql, generateConteudosSql, generateExerciciosSql, generateQuestSql } from "./sqlGenerators.js";
 
 const CSV_DIR = join(import.meta.dirname, "..", "csv");
 const OUTPUT_DIR = join(import.meta.dirname, "..", "output");
@@ -24,6 +27,7 @@ interface CsvGroup {
   novosExerciciosFile: string | null;
   recorrenciaFile: string | null;
   contentsFile: string | null;
+  templatesExerciciosFile: string | null;
   label: string;
 }
 
@@ -39,6 +43,11 @@ interface ExerciciosOnly {
 
 interface ConteudosOnly {
   novosConteudosFile: string;
+  label: string;
+}
+
+interface QuestionariosOnly {
+  novosQuestionariosFile: string;
   label: string;
 }
 
@@ -71,13 +80,19 @@ function discoverCsvGroups(dir: string): CsvGroup[] {
       (f) => f.startsWith(prefix) && f.includes("(Novos_exercicios)") && f.endsWith(".csv")
     ) || null;
 
-    const recorrenciaFile = files.find(
-      (f) => f.startsWith(prefix) && f.includes("(Template_recorrencia)") && f.endsWith(".csv")
-    ) || null;
+    const recorrenciaFile =
+      files.find((f) => f.startsWith(prefix) && f.includes("(Template_recorrencia)") && f.endsWith(".csv"))
+      || files.find((f) => f.includes("(Template_recorrencia)") && f.endsWith(".csv"))
+      || null;
 
     const contentsFile = files.find(
       (f) => f.startsWith(prefix) && f.includes("(Template_conteudos)") && f.endsWith(".csv")
     ) || null;
+
+    const templatesExerciciosFile =
+      files.find((f) => f.startsWith(prefix) && f.includes("(Templates_exercicios)") && f.endsWith(".csv"))
+      || files.find((f) => f.includes("(Templates_exercicios)") && f.endsWith(".csv"))
+      || null;
 
     groups.push({
       programFile: join(dir, pf),
@@ -86,6 +101,7 @@ function discoverCsvGroups(dir: string): CsvGroup[] {
       novosExerciciosFile: novosExerciciosFile ? join(dir, novosExerciciosFile) : null,
       recorrenciaFile: recorrenciaFile ? join(dir, recorrenciaFile) : null,
       contentsFile: contentsFile ? join(dir, contentsFile) : null,
+      templatesExerciciosFile: templatesExerciciosFile ? join(dir, templatesExerciciosFile) : null,
       label: labelFromPrefix(prefix),
     });
   }
@@ -117,6 +133,15 @@ function discoverNovosConteudos(dir: string): ConteudosOnly[] {
     .map((f) => ({
       novosConteudosFile: join(dir, f),
       label: labelFromPrefix(f.split("(Novos_conteudos)")[0]),
+    }));
+}
+
+function discoverNovosQuestionarios(dir: string): QuestionariosOnly[] {
+  return readdirSync(dir)
+    .filter((f) => f.includes("(Novos_questionarios_predefinido)") && f.endsWith(".csv"))
+    .map((f) => ({
+      novosQuestionariosFile: join(dir, f),
+      label: labelFromPrefix(f.split("(Novos_questionarios_predefinido)")[0]),
     }));
 }
 
@@ -154,6 +179,19 @@ function writeContentSql(novosConteudosFile: string, label: string): void {
   const contentPath = join(OUTPUT_DIR, `${label}_01-Content.sql`);
   writeFileSync(contentPath, contentSql, "utf-8");
   console.log(`  -> 01-Content.sql (${newContents.length} new content(s))`);
+}
+
+function writeQuestSql(novosQuestionariosFile: string, label: string): void {
+  const questionnaires = parseNovosQuestionariosCsv(novosQuestionariosFile);
+  const questSql = generateQuestSql(questionnaires);
+  if (!questSql) {
+    console.log(`  -> 01-Quest.sql skipped (no new questionnaires)`);
+    return;
+  }
+  const questPath = join(OUTPUT_DIR, `${label}_01-Quest.sql`);
+  writeFileSync(questPath, questSql, "utf-8");
+  const totalQuestions = questionnaires.reduce((acc, q) => acc + q.questions.length, 0);
+  console.log(`  -> 01-Quest.sql (${questionnaires.length} questionnaire(s), ${totalQuestions} question(s))`);
 }
 
 function runOnlyNovosParametros(): void {
@@ -210,6 +248,24 @@ function runOnlyNovosConteudos(): void {
   console.log("\nDone! Output written to:", OUTPUT_DIR);
 }
 
+function runOnlyNovosQuestionarios(): void {
+  const items = discoverNovosQuestionarios(CSV_DIR);
+  if (items.length === 0) {
+    console.error("No Novos_questionarios_predefinido CSV found in:", CSV_DIR);
+    process.exit(1);
+  }
+
+  mkdirSync(OUTPUT_DIR, { recursive: true });
+
+  for (const item of items) {
+    console.log(`\nProcessing: ${item.label}`);
+    console.log(`  Questionarios CSV: ${basename(item.novosQuestionariosFile)}`);
+    writeQuestSql(item.novosQuestionariosFile, item.label);
+  }
+
+  console.log("\nDone! Output written to:", OUTPUT_DIR);
+}
+
 function runFullGeneration(): void {
   const groups = discoverCsvGroups(CSV_DIR);
   if (groups.length === 0) {
@@ -223,6 +279,10 @@ function runFullGeneration(): void {
   // (on the first program iteration) and before that program's template inserts.
   const conteudos = discoverNovosConteudos(CSV_DIR);
   let conteudosEmitted = false;
+
+  // Questionarios catalog is also program-agnostic; emit once after parametros (per user spec).
+  const questionarios = discoverNovosQuestionarios(CSV_DIR);
+  let questionariosEmitted = false;
 
   for (const group of groups) {
     console.log(`\nProcessing: ${group.label}`);
@@ -240,20 +300,40 @@ function runFullGeneration(): void {
     if (group.contentsFile) {
       console.log(`  Contents CSV:   ${basename(group.contentsFile)}`);
     }
+    if (group.templatesExerciciosFile) {
+      console.log(`  Templ. Exerc.:  ${basename(group.templatesExerciciosFile)}`);
+    }
 
     const program = parseProgramCsv(group.programFile);
     const parameters = parseParametersCsv(group.parametersFile);
     const schedules = group.recorrenciaFile
       ? parseBiometricSchedulesCsv(group.recorrenciaFile)
       : [];
+    const exercisePlans = group.recorrenciaFile
+      ? parseExercisePlansCsv(group.recorrenciaFile)
+      : [];
+    const contentPlans = group.recorrenciaFile
+      ? parseContentPlansCsv(group.recorrenciaFile)
+      : [];
 
     console.log(`  Program: ${program.name} (${program.code})`);
-    console.log(`  Parameters: ${parameters.length}, Schedules: ${schedules.length}`);
+    console.log(`  Parameters: ${parameters.length}, Schedules: ${schedules.length}, Exercise plans: ${exercisePlans.length}, Content plans: ${contentPlans.length}`);
 
     if (group.novosParametrosFile) {
       writeBpSql(group.novosParametrosFile, group.label);
     } else {
       console.log(`  -> 01-BP.sql skipped (no Novos_parametros CSV)`);
+    }
+
+    if (!questionariosEmitted) {
+      for (const item of questionarios) {
+        console.log(`  Questionarios catalog: ${basename(item.novosQuestionariosFile)}`);
+        writeQuestSql(item.novosQuestionariosFile, item.label);
+      }
+      if (questionarios.length === 0) {
+        console.log(`  -> 01-Quest.sql skipped (no Novos_questionarios_predefinido CSV)`);
+      }
+      questionariosEmitted = true;
     }
 
     if (group.novosExerciciosFile) {
@@ -273,26 +353,33 @@ function runFullGeneration(): void {
       conteudosEmitted = true;
     }
 
-    const templateSql = generateTemplateSql(program, parameters, schedules);
+    const templateSql = generateTemplateSql(program, parameters, schedules, exercisePlans, contentPlans);
     const templatePath = join(OUTPUT_DIR, `${group.label}_02-Template.sql`);
     writeFileSync(templatePath, templateSql, "utf-8");
     console.log(`  -> 02-Template.sql`);
 
-    if (group.contentsFile && group.recorrenciaFile) {
-      const plans = parseContentPlansCsv(group.recorrenciaFile);
+    if (group.contentsFile) {
       const items = parseContentsCsv(group.contentsFile);
-      console.log(`  Plans: ${plans.length}, Items: ${items.length}`);
+      console.log(`  Items: ${items.length}`);
 
-      const conteudosSql = generateConteudosSql(program.code, plans, items);
+      const conteudosSql = generateConteudosSql(program.code, items);
       const conteudosPath = join(OUTPUT_DIR, `${group.label}_03-Conteudos.sql`);
       writeFileSync(conteudosPath, conteudosSql, "utf-8");
       console.log(`  -> 03-Conteudos.sql`);
     } else {
-      const missing = [
-        group.contentsFile ? null : "Template_conteudos",
-        group.recorrenciaFile ? null : "Template_recorrencia",
-      ].filter(Boolean).join(" + ");
-      console.log(`  -> 03-Conteudos.sql skipped (no ${missing} CSV)`);
+      console.log(`  -> 03-Conteudos.sql skipped (no Template_conteudos CSV)`);
+    }
+
+    if (group.templatesExerciciosFile) {
+      const exerciseItems = parseTemplatesExerciciosCsv(group.templatesExerciciosFile);
+      console.log(`  Exercise items: ${exerciseItems.length}`);
+
+      const exerciciosSql = generateExerciciosSql(program.code, exerciseItems);
+      const exerciciosPath = join(OUTPUT_DIR, `${group.label}_04-Exercicios.sql`);
+      writeFileSync(exerciciosPath, exerciciosSql, "utf-8");
+      console.log(`  -> 04-Exercicios.sql`);
+    } else {
+      console.log(`  -> 04-Exercicios.sql skipped (no Templates_exercicios CSV)`);
     }
   }
 
@@ -302,9 +389,10 @@ function runFullGeneration(): void {
 async function main(): Promise<void> {
   console.log("=== Template Generator ===\n");
   console.log("  1) Crear nuevos parámetros biométricos (solo 01-BP.sql)");
-  console.log("  2) Crear nuevos exercicios (solo 01-PRE.sql)");
-  console.log("  3) Crear nuevos conteudos (solo 01-Content.sql)");
-  console.log("  4) Generar template completo (01-BP + 01-PRE + 01-Content + 02-Template + 03-Conteudos)");
+  console.log("  2) Crear nuevos cuestionarios predefinidos (solo 01-Quest.sql)");
+  console.log("  3) Crear nuevos exercicios (solo 01-PRE.sql)");
+  console.log("  4) Crear nuevos conteudos (solo 01-Content.sql)");
+  console.log("  5) Generar template completo (01-BP + 01-Quest + 01-PRE + 01-Content + 02-Template + 03-Conteudos + 04-Exercicios)");
   console.log("  q) Salir\n");
 
   const rl = createInterface({ input, output });
@@ -316,12 +404,15 @@ async function main(): Promise<void> {
       runOnlyNovosParametros();
       break;
     case "2":
-      runOnlyNovosExercicios();
+      runOnlyNovosQuestionarios();
       break;
     case "3":
-      runOnlyNovosConteudos();
+      runOnlyNovosExercicios();
       break;
     case "4":
+      runOnlyNovosConteudos();
+      break;
+    case "5":
       runFullGeneration();
       break;
     case "q":

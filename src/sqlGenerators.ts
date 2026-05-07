@@ -1,4 +1,4 @@
-import type { ProgramData, TemplateParameter, NewParameter, NewExercise, NewContent, BiometricSchedule, ContentPlan, EducationalContentItem } from "./types.js";
+import type { ProgramData, TemplateParameter, NewParameter, NewExercise, NewContent, BiometricSchedule, ContentPlan, ExercisePlan, EducationalContentItem, TemplateExerciseItem, AnswerKey, PredefinedQuestion, PredefinedQuestionnaire } from "./types.js";
 
 function sqlString(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
@@ -146,12 +146,95 @@ VALUES (
 );`;
 }
 
+// -- TemplatePhysicalRehabilitationPlan + schedule ----------------------------
+
+function exercisePlanLookup(programCode: string, description: string): string {
+  return `(SELECT [Id] FROM [TemplatePhysicalRehabilitationPlan] WHERE [ProgramCode] = ${sqlString(programCode)} AND [Description] = ${sqlString(description)})`;
+}
+
+function generateExercisePlanInsert(programCode: string, plan: ExercisePlan): string {
+  return `INSERT INTO [dbo].[TemplatePhysicalRehabilitationPlan] ([Id] ,[TemplateId] ,[Description] ,[IsRecurringMonitoring] ,[DurationInDays] ,[NumberOccurrences] ,[StartTime] ,[EndTime] ,[ReceiveUnfulfilledAlerts] ,[IsActive] ,[ProgramCode])
+VALUES (
+    NEWID() --id
+    ,(SELECT [Id] FROM [dbo].[Template] WHERE [ProgramCode] = ${sqlString(programCode)}) --templateId
+    ,${sqlString(plan.description)} --description
+    ,1 --isRecurringMonitoring
+    ,${plan.durationDays} --durationInDays
+    ,NULL --numberOccurrences
+    ,NULL --startTime
+    ,NULL --endTime
+    ,0 --receiveUnfulfilledAlerts
+    ,1 --isActive
+    ,${sqlString(programCode)} --programCode
+    );`;
+}
+
+function generateExercisePeriodInsert(programCode: string, plan: ExercisePlan): string {
+  return `INSERT INTO [dbo].[TemplatePhysicalRehabilitationPeriod] ([Id] ,[TemplatePhysicalRehabilitationPlanId] ,[PeriodCode] ,[IsActive])
+VALUES (
+    NEWID() --id
+    ,${exercisePlanLookup(programCode, plan.description)} --templatePhysicalRehabilitationPlanId
+    ,${sqlString(plan.periodCode)} --periodCode
+    ,1 --isActive
+    );`;
+}
+
+function generateExerciseWeekDayInsert(programCode: string, plan: ExercisePlan, dayNumber: number): string {
+  return `INSERT INTO [dbo].[TemplatePhysicalRehabilitationWeekDay] ([Id] ,[TemplatePhysicalRehabilitationPlanId] ,[DayNumber] ,[IsActive])
+VALUES (
+    NEWID() --id
+    ,${exercisePlanLookup(programCode, plan.description)} --templatePhysicalRehabilitationPlanId
+    ,${dayNumber} --dayNumber
+    ,1 --isActive
+    );`;
+}
+
+function generateExerciseWeekDayTimerInsert(programCode: string, plan: ExercisePlan, dayNumber: number, time: string): string {
+  const weekDayLookup = `(SELECT [Id] FROM [TemplatePhysicalRehabilitationWeekDay] WHERE [DayNumber] = ${dayNumber} AND [TemplatePhysicalRehabilitationPlanId] = ${exercisePlanLookup(programCode, plan.description)})`;
+  return `INSERT INTO [dbo].[TemplatePhysicalRehabilitationWeekDayTimer] ([Id] ,[TemplatePhysicalRehabilitationWeekDayId] ,[WeekDayStartTime] ,[WeekDayEndTime] ,[IsActive])
+VALUES (
+    NEWID() --id
+    ,${weekDayLookup} --templatePhysicalRehabilitationWeekDayId
+    ,${formatWeekDayStartTime(time)} --weekDayStartTime
+    ,NULL --weekDayEndTime
+    ,1 --isActive
+    );`;
+}
+
+// -- TemplateEducationalContentPlan + schedule --------------------------------
+
+function contentPlanLookup(programCode: string, description: string): string {
+  return `(SELECT [Id] FROM [TemplateEducationalContentPlan] WHERE [ProgramCode] = ${sqlString(programCode)} AND [Description] = ${sqlString(description)})`;
+}
+
+function generateContentPlanPeriodInsert(programCode: string, plan: ContentPlan): string {
+  return `INSERT INTO [dbo].[TemplateEducationalContentPeriod] ([Id] ,[TemplateEducationalContentPlanId] ,[IsActive] ,[PeriodCode])
+VALUES (
+    NEWID() --id
+    ,${contentPlanLookup(programCode, plan.description)} --templateEducationalContentPlanId
+    ,1 --isActive
+    ,${sqlString(plan.periodCode)} --periodCode
+    );`;
+}
+
+function generateContentPlanWeekDayInsert(programCode: string, plan: ContentPlan, dayNumber: number): string {
+  return `INSERT INTO [dbo].[TemplateEducationalContentWeekDay] ([Id] ,[TemplateEducationalContentPlanId] ,[DayNumber] ,[IsActive])
+VALUES (
+    NEWID() --id
+    ,${contentPlanLookup(programCode, plan.description)} --templateEducationalContentPlanId
+    ,${dayNumber} --dayNumber
+    ,1 --isActive
+    );`;
+}
+
 // -- Public API ---------------------------------------------------------------
 
 export function generateTemplateSql(
   program: ProgramData,
   parameters: TemplateParameter[],
-  schedules: BiometricSchedule[]
+  schedules: BiometricSchedule[],
+  exercisePlans: ExercisePlan[],
+  contentPlans: ContentPlan[]
 ): string {
   const lines: string[] = [
     `-- =============================================`,
@@ -193,6 +276,61 @@ export function generateTemplateSql(
         }
         lines.push("");
       }
+    }
+  }
+
+  for (const plan of exercisePlans) {
+    lines.push("");
+    lines.push("");
+    lines.push(`-- =============================================`);
+    lines.push(`-- Exercicios: ${plan.description}`);
+    lines.push(`-- =============================================`);
+    lines.push("GO");
+    lines.push(generateExercisePlanInsert(program.code, plan));
+
+    if (plan.periodCode) {
+      lines.push("");
+      lines.push("--Periods");
+      lines.push(generateExercisePeriodInsert(program.code, plan));
+    }
+
+    if (plan.weekDays.length > 0) {
+      lines.push("");
+      lines.push("--Week days and hours");
+      for (const day of plan.weekDays) {
+        lines.push(`--Day ${day.dayNumber} - ${day.times.join(" , ")}`);
+        lines.push(generateExerciseWeekDayInsert(program.code, plan, day.dayNumber));
+        for (const time of day.times) {
+          lines.push(generateExerciseWeekDayTimerInsert(program.code, plan, day.dayNumber, time));
+        }
+        lines.push("");
+      }
+    }
+  }
+
+  for (const plan of contentPlans) {
+    lines.push("");
+    lines.push("");
+    lines.push(`-- =============================================`);
+    lines.push(`-- Educational Content Plans: ${plan.description}`);
+    lines.push(`-- =============================================`);
+    lines.push("GO");
+    lines.push(generateEducationalContentPlanInsert(program.code, plan));
+
+    if (plan.periodCode) {
+      lines.push("");
+      lines.push("--Periods");
+      lines.push(generateContentPlanPeriodInsert(program.code, plan));
+    }
+
+    if (plan.activeDays.length > 0) {
+      lines.push("");
+      lines.push("--Week days");
+      for (const dayNumber of plan.activeDays) {
+        lines.push(`--Day ${dayNumber}`);
+        lines.push(generateContentPlanWeekDayInsert(program.code, plan, dayNumber));
+      }
+      lines.push("");
     }
   }
 
@@ -346,23 +484,237 @@ function generateEducationalContentItemInsert(
 
 export function generateConteudosSql(
   programCode: string,
-  plans: ContentPlan[],
   items: EducationalContentItem[]
 ): string {
   const lines: string[] = [
     `-- =============================================`,
-    `-- Educational Content Plans (${programCode})`,
+    `-- Educational Content Items (${programCode})`,
     `-- =============================================`,
   ];
 
-  for (const plan of plans) {
-    lines.push("", generateEducationalContentPlanInsert(programCode, plan));
-  }
-
+  let lastPlan = "";
   for (const item of items) {
+    if (item.planDescription !== lastPlan) {
+      lines.push("");
+      lines.push(`-- Plan: ${item.planDescription}`);
+      lastPlan = item.planDescription;
+    }
     lines.push("", generateEducationalContentItemInsert(item, programCode));
   }
 
   lines.push("");
+  return lines.join("\n");
+}
+
+// -- TemplatePhysicalRehabilitationItem INSERT --------------------------------
+
+function generateTemplateExerciseItemInsert(item: TemplateExerciseItem, programCode: string): string {
+  const planLookup = `(SELECT [Id] FROM [TemplatePhysicalRehabilitationPlan] WHERE [ProgramCode] = ${sqlString(programCode)} AND [Description] = ${sqlString(item.planDescription)})`;
+  const instructions = item.instructions ? sqlString(item.instructions) : "NULL";
+
+  return `INSERT INTO [dbo].[TemplatePhysicalRehabilitationItem] ([Id] ,[TemplatePhysicalRehabilitationPlanId] ,[PhysicalExerciseCode] ,[Order] ,[Instructions] ,[IsActive])
+VALUES (
+    NEWID() --id
+    ,${planLookup} --templatePhysicalRehabilitationPlanId
+    ,${sqlString(item.code)} --physicalExerciseCode
+    ,${item.order} --order
+    ,${instructions} --instructions
+    ,1 --isActive
+);`;
+}
+
+// -- 04-Exercicios.sql --------------------------------------------------------
+
+export function generateExerciciosSql(
+  programCode: string,
+  items: TemplateExerciseItem[]
+): string {
+  const lines: string[] = [
+    `-- =============================================`,
+    `-- Template Physical Rehabilitation Items (${programCode})`,
+    `-- =============================================`,
+  ];
+
+  let lastPlan = "";
+  for (const item of items) {
+    if (item.planDescription !== lastPlan) {
+      lines.push("");
+      lines.push(`-- Plan: ${item.planDescription}`);
+      lastPlan = item.planDescription;
+    }
+    lines.push("", generateTemplateExerciseItemInsert(item, programCode));
+  }
+
+  lines.push("");
+  return lines.join("\n");
+}
+
+// -- Answer / Question / QuestionAnswer / ProfessionalQuestionnaire ----------
+
+const SYSTEM_USER = "'00000000-0000-0000-0000-000000000000'";
+
+function generateAnswerInsert(key: AnswerKey): string {
+  return `INSERT INTO [dbo].[Answer] ([Id] ,[Code] ,[Description] ,[ShortDescription] ,[Value] ,[Order] ,[IsActive] ,[CreateBy] ,[CreateDateTime] ,[ModifyBy] ,[ModifyDateTime] ,[EndValue] ,[Score])
+VALUES (
+    NEWID() --id
+    ,${sqlString(key.code)} --code
+    ,${sqlString(key.description)} --description
+    ,${sqlString(key.description)} --shortDescription
+    ,${key.value} --value
+    ,NULL --order
+    ,1 --isActive
+    ,${SYSTEM_USER} --createBy
+    ,SYSDATETIME() --createDateTime
+    ,${SYSTEM_USER} --modifyBy
+    ,NULL --modifyDateTime
+    ,NULL --endValue
+    ,NULL --score
+);`;
+}
+
+function generateQuestionInsert(question: PredefinedQuestion): string {
+  const dataType = question.responseKeyType === "LIKERT" ? "STRING" : "NUMERIC";
+  const minValue = question.minValue != null ? String(question.minValue) : "NULL";
+  const maxValue = question.maxValue != null ? String(question.maxValue) : "NULL";
+  const order = question.order != null ? String(question.order) : "NULL";
+  const instructions = question.instructions ? sqlString(question.instructions) : "NULL";
+  const responseKeyType = question.responseKeyType ? sqlString(question.responseKeyType) : "NULL";
+
+  return `INSERT INTO [dbo].[Question] ([Id] ,[Code] ,[Description] ,[ShortDescription] ,[Order] ,[IsActive] ,[CreateBy] ,[CreateDateTime] ,[ModifyBy] ,[ModifyDateTime] ,[DataType] ,[Instructions] ,[ResponseKeyType] ,[MinValue] ,[MaxValue] ,[ParentQuestionId] ,[UseInCustomQuestionnaire] ,[Title])
+VALUES (
+    NEWID() --id
+    ,${sqlString(question.code)} --code
+    ,${sqlString(question.description)} --description
+    ,${sqlString(question.description)} --shortDescription
+    ,${order} --order
+    ,1 --isActive
+    ,${SYSTEM_USER} --createBy
+    ,SYSDATETIME() --createDateTime
+    ,${SYSTEM_USER} --modifyBy
+    ,NULL --modifyDateTime
+    ,'${dataType}' --dataType
+    ,${instructions} --instructions
+    ,${responseKeyType} --responseKeyType
+    ,${minValue} --minValue
+    ,${maxValue} --maxValue
+    ,NULL --parentQuestionId
+    ,${question.useInCustomQuestionnaire} --useInCustomQuestionnaire
+    ,${sqlString(question.title)} --title
+);`;
+}
+
+function generateQuestionAnswerInsert(questionCode: string, key: AnswerKey): string {
+  return `INSERT INTO [dbo].[QuestionAnswer] ([Id] ,[QuestionId] ,[AnswerId] ,[Order] ,[IsActive] ,[CreateBy] ,[CreateDateTime] ,[ModifyBy] ,[ModifyDateTime])
+VALUES (
+    NEWID() --id
+    ,(SELECT [Id] FROM [Question] WHERE [Code] = ${sqlString(questionCode)}) --questionId
+    ,(SELECT [Id] FROM [Answer] WHERE [Code] = ${sqlString(key.code)}) --answerId
+    ,${key.value} --order
+    ,1 --isActive
+    ,${SYSTEM_USER} --createBy
+    ,SYSDATETIME() --createDateTime
+    ,${SYSTEM_USER} --modifyBy
+    ,NULL --modifyDateTime
+);`;
+}
+
+function generateProfessionalQuestionnaireInsert(questionnaire: PredefinedQuestionnaire): string {
+  const instructions = questionnaire.instructions ? sqlString(questionnaire.instructions) : "NULL";
+  return `INSERT INTO [dbo].[ProfessionalQuestionnaire] ([Id] ,[Description] ,[QuestionnaireCategoryId] ,[OrganizationId] ,[ProfessionalId] ,[IsActive] ,[CreateBy] ,[CreateDateTime] ,[ModifyBy] ,[ModifyDateTime] ,[DeactivationDateTime] ,[DisabledBy] ,[Code] ,[IsVisible] ,[Context] ,[Instructions] ,[IconURL])
+VALUES (
+    NEWID() --id
+    ,${sqlString(questionnaire.description)} --description
+    ,(SELECT [Id] FROM [QuestionnaireCategory] WHERE [Code] = 'PREDEFINED') --questionnaireCategoryId
+    ,NULL --organizationId
+    ,NULL --professionalId
+    ,1 --isActive
+    ,${SYSTEM_USER} --createBy
+    ,SYSDATETIME() --createDateTime
+    ,NULL --modifyBy
+    ,NULL --modifyDateTime
+    ,NULL --deactivationDateTime
+    ,NULL --disabledBy
+    ,${sqlString(questionnaire.code)} --code
+    ,1 --isVisible
+    ,NULL --context
+    ,${instructions} --instructions
+    ,NULL --iconURL
+);`;
+}
+
+function generateProfessionalQuestionnaireQuestionInsert(question: PredefinedQuestion, questionnaireCode: string): string {
+  const order = question.order != null ? String(question.order) : "NULL";
+  return `INSERT INTO [dbo].[ProfessionalQuestionnaireQuestion] ([Id] ,[QuestionId] ,[ProfessionalQuestionnaireId] ,[IsActive] ,[CreateBy] ,[CreateDateTime] ,[Order] ,[QuestionNumber])
+VALUES (
+    NEWID() --id
+    ,(SELECT [Id] FROM [Question] WHERE [Code] = ${sqlString(question.code)}) --questionId
+    ,(SELECT [Id] FROM [ProfessionalQuestionnaire] WHERE [Code] = ${sqlString(questionnaireCode)}) --professionalQuestionnaireId
+    ,1 --isActive
+    ,${SYSTEM_USER} --createBy
+    ,SYSDATETIME() --createDateTime
+    ,${order} --order
+    ,${sqlString(question.questionNumber)} --questionNumber
+);`;
+}
+
+// -- 01-Quest.sql -------------------------------------------------------------
+
+export function generateQuestSql(questionnaires: PredefinedQuestionnaire[]): string | null {
+  if (questionnaires.length === 0) return null;
+
+  const lines: string[] = [];
+  const emittedAnswerCodes = new Set<string>();
+
+  for (const q of questionnaires) {
+    lines.push("-- =============================================");
+    lines.push(`-- Novo questionário: ${q.description}`);
+    lines.push("-- =============================================");
+
+    for (const question of q.questions) {
+      lines.push("");
+      lines.push(`-- ###### Questão ${question.code}: ${question.description} ######`);
+
+      if (question.newAnswerKeys && question.answerKeys.length > 0) {
+        lines.push("");
+        lines.push("-- Chaves de resposta");
+        for (const key of question.answerKeys) {
+          if (emittedAnswerCodes.has(key.code)) continue;
+          emittedAnswerCodes.add(key.code);
+          lines.push(generateAnswerInsert(key));
+          lines.push("GO");
+        }
+      }
+
+      lines.push("");
+      lines.push("-- Question");
+      lines.push(generateQuestionInsert(question));
+      lines.push("GO");
+
+      if (question.answerKeys.length > 0) {
+        lines.push("");
+        lines.push("-- Question Answers");
+        for (const key of question.answerKeys) {
+          lines.push(generateQuestionAnswerInsert(question.code, key));
+          lines.push("GO");
+        }
+      }
+    }
+
+    lines.push("");
+    lines.push("-- Professional Questionnaire");
+    lines.push(generateProfessionalQuestionnaireInsert(q));
+    lines.push("GO");
+
+    lines.push("");
+    lines.push("-- Professional Questionnaire Questions");
+    for (const question of q.questions) {
+      lines.push(generateProfessionalQuestionnaireQuestionInsert(question, q.code));
+      lines.push("GO");
+    }
+
+    lines.push("");
+    lines.push("");
+  }
+
   return lines.join("\n");
 }

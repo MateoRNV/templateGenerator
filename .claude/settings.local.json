@@ -7,7 +7,8 @@
       "Bash(npx tsx:*)",
       "Bash(rm:*)",
       "Bash(npm run *)",
-      "PowerShell($files = Get-ChildItem C:\\\\repos\\\\templateGenerator\\\\csv -Force; $files | ForEach-Object { Write-Output \\(\"{0} | {1} bytes\" -f $_.Name, $_.Length\\) })"
+      "PowerShell($files = Get-ChildItem C:\\\\repos\\\\templateGenerator\\\\csv -Force; $files | ForEach-Object { Write-Output \\(\"{0} | {1} bytes\" -f $_.Name, $_.Length\\) })",
+      "Bash(npx tsc *)"
     ]
   }
 }
