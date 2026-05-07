@@ -8,6 +8,10 @@ function formatDecimal(value: number): string {
   return `CAST(${value} AS Decimal(19, 6))`;
 }
 
+function splitPeriodCodes(periodCode: string): string[] {
+  return periodCode.split(",").map(p => p.trim()).filter(p => p.length > 0);
+}
+
 // -- Template INSERT -----------------------------------------------------------
 
 function generateTemplateInsert(program: ProgramData): string {
@@ -169,12 +173,12 @@ VALUES (
     );`;
 }
 
-function generateExercisePeriodInsert(programCode: string, plan: ExercisePlan): string {
+function generateExercisePeriodInsert(programCode: string, plan: ExercisePlan, periodCode: string): string {
   return `INSERT INTO [dbo].[TemplatePhysicalRehabilitationPeriod] ([Id] ,[TemplatePhysicalRehabilitationPlanId] ,[PeriodCode] ,[IsActive])
 VALUES (
     NEWID() --id
     ,${exercisePlanLookup(programCode, plan.description)} --templatePhysicalRehabilitationPlanId
-    ,${sqlString(plan.periodCode)} --periodCode
+    ,${sqlString(periodCode)} --periodCode
     ,1 --isActive
     );`;
 }
@@ -207,13 +211,13 @@ function contentPlanLookup(programCode: string, description: string): string {
   return `(SELECT [Id] FROM [TemplateEducationalContentPlan] WHERE [ProgramCode] = ${sqlString(programCode)} AND [Description] = ${sqlString(description)})`;
 }
 
-function generateContentPlanPeriodInsert(programCode: string, plan: ContentPlan): string {
+function generateContentPlanPeriodInsert(programCode: string, plan: ContentPlan, periodCode: string): string {
   return `INSERT INTO [dbo].[TemplateEducationalContentPeriod] ([Id] ,[TemplateEducationalContentPlanId] ,[IsActive] ,[PeriodCode])
 VALUES (
     NEWID() --id
     ,${contentPlanLookup(programCode, plan.description)} --templateEducationalContentPlanId
     ,1 --isActive
-    ,${sqlString(plan.periodCode)} --periodCode
+    ,${sqlString(periodCode)} --periodCode
     );`;
 }
 
@@ -300,11 +304,11 @@ VALUES (
 );`;
 }
 
-function generateTemplateQuestionnairePeriodInsert(programCode: string, q: ResolvedQuestionnaire): string {
+function generateTemplateQuestionnairePeriodInsert(programCode: string, q: ResolvedQuestionnaire, periodCode: string): string {
   return `INSERT INTO [dbo].[TemplateQuestionnairePeriod] ([Id] ,[Code] ,[TemplateQuestionnaireId] ,[IsActive])
 VALUES (
     NEWID() --id
-    ,${sqlString(q.schedule.periodCode)} --code
+    ,${sqlString(periodCode)} --code
     ,${templateQuestionnaireLookup(programCode, q.code)} --templateQuestionnaireId
     ,1 --isActive
 );`;
@@ -369,7 +373,10 @@ export function generateTemplateSql(
     if (schedule.periodCode) {
       lines.push("");
       lines.push("--Periods");
-      lines.push(generateBiometricPeriodInsert(param.code, schedule.periodCode, program.code));
+      const periods = splitPeriodCodes(schedule.periodCode);
+      for (const period of periods) {
+        lines.push(generateBiometricPeriodInsert(param.code, period, program.code));
+      }
     }
 
     if (schedule.weekDays.length > 0) {
@@ -399,7 +406,10 @@ export function generateTemplateSql(
     if (q.schedule.periodCode) {
       lines.push("");
       lines.push("--Periods");
-      lines.push(generateTemplateQuestionnairePeriodInsert(program.code, q));
+      const periods = splitPeriodCodes(q.schedule.periodCode);
+      for (const period of periods) {
+        lines.push(generateTemplateQuestionnairePeriodInsert(program.code, q, period));
+      }
     }
 
     if (q.schedule.weekDays.length > 0) {
@@ -428,7 +438,10 @@ export function generateTemplateSql(
     if (plan.periodCode) {
       lines.push("");
       lines.push("--Periods");
-      lines.push(generateExercisePeriodInsert(program.code, plan));
+      const periods = splitPeriodCodes(plan.periodCode);
+      for (const period of periods) {
+        lines.push(generateExercisePeriodInsert(program.code, plan, period));
+      }
     }
 
     if (plan.weekDays.length > 0) {
@@ -457,7 +470,10 @@ export function generateTemplateSql(
     if (plan.periodCode) {
       lines.push("");
       lines.push("--Periods");
-      lines.push(generateContentPlanPeriodInsert(program.code, plan));
+      const periods = splitPeriodCodes(plan.periodCode);
+      for (const period of periods) {
+        lines.push(generateContentPlanPeriodInsert(program.code, plan, period));
+      }
     }
 
     if (plan.activeDays.length > 0) {
