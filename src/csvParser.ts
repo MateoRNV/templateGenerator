@@ -209,6 +209,7 @@ export function parseQuestionnaireSchedulesCsv(filePath: string): QuestionnaireS
 
     schedules.push({
       description: row[2],
+      code: (row[3] || "").trim(),
       durationDays: Number(row[8]) || 365,
       periodCode: (row[11] || "").trim(),
       weekDays,

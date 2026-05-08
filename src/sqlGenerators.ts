@@ -286,14 +286,9 @@ function resolveQuestionnaireSchedules(
 
   return schedules.map((schedule) => {
     const match = byNorm.get(normalizeForMatch(schedule.description));
-    if (match) {
-      return { code: match.code, description: match.description, schedule };
-    }
-    return {
-      code: deriveQuestionnaireCode(schedule.description),
-      description: schedule.description,
-      schedule,
-    };
+    const description = match ? match.description : schedule.description;
+    const code = schedule.code || (match ? match.code : deriveQuestionnaireCode(schedule.description));
+    return { code, description, schedule };
   });
 }
 

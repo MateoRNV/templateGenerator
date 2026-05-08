@@ -76,6 +76,7 @@ export interface ExercisePlan {
 
 export interface QuestionnaireSchedule {
   description: string;
+  code: string;
   durationDays: number;
   periodCode: string;
   weekDays: WeekDaySchedule[];
