@@ -62,7 +62,7 @@ VALUES
     ,${sqlString(param.code)} --code
     ,'' --snomed
     ,'' --codeDataEntry
-    ,1 --isRecurringMonitoring
+    ,${param.isRecurring ? 1 : 0} --isRecurringMonitoring
     ,1 --isActive
     ,(SELECT [Id] FROM [dbo].[Template] WHERE [ProgramCode] = ${sqlString(programCode)}) --templateId
     ,${param.durationDays} --durationInDays
@@ -180,7 +180,7 @@ VALUES (
     NEWID() --id
     ,(SELECT [Id] FROM [dbo].[Template] WHERE [ProgramCode] = ${sqlString(programCode)}) --templateId
     ,${sqlString(plan.description)} --description
-    ,1 --isRecurringMonitoring
+    ,${plan.isRecurring ? 1 : 0} --isRecurringMonitoring
     ,${plan.durationDays} --durationInDays
     ,NULL --numberOccurrences
     ,NULL --startTime
@@ -304,7 +304,7 @@ VALUES (
     ,${sqlString(q.description)} --description
     ,NULL --templateQuestionnaireCategoryId
     ,NULL --startTime
-    ,1 --isRecurringMonitoring
+    ,${q.schedule.isRecurring ? 1 : 0} --isRecurringMonitoring
     ,1 --isActive
     ,${sqlString(programCode)} --programCode
     ,(SELECT [Id] FROM [dbo].[Template] WHERE [ProgramCode] = ${sqlString(programCode)}) --templateId
@@ -414,6 +414,8 @@ export function generateTemplateSql(
     lines.push(`-- =============================================`);
     lines.push(generateTemplateQuestionnaireInsert(program.code, q));
 
+    if (!q.schedule.isRecurring) continue;
+
     if (q.schedule.periodCode) {
       lines.push("");
       lines.push("--Periods");
@@ -445,6 +447,8 @@ export function generateTemplateSql(
     lines.push(`-- =============================================`);
     lines.push(generateExercisePlanInsert(program.code, plan));
 
+    if (!plan.isRecurring) continue;
+
     if (plan.periodCode) {
       lines.push("");
       lines.push("--Periods");
@@ -475,6 +479,8 @@ export function generateTemplateSql(
     lines.push(`-- Educational Content Plans: ${plan.description}`);
     lines.push(`-- =============================================`);
     lines.push(generateEducationalContentPlanInsert(program.code, plan));
+
+    if (!plan.isRecurring) continue;
 
     if (plan.periodCode) {
       lines.push("");

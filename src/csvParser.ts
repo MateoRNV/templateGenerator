@@ -7,6 +7,11 @@ function parseNum(val: string): number | null {
   return isNaN(n) ? null : n;
 }
 
+function parseRecurring(val: string): boolean {
+  const norm = normalizeAccents(val.trim().toLowerCase());
+  return norm !== "nao" && norm !== "não" && norm !== "0" && norm !== "false" && norm !== "no" && norm !== "n";
+}
+
 function readCsvFile(filePath: string): string[][] {
   // CSVs may come as Windows-1252 (Excel default on Windows) or UTF-8 (re-saved by an editor).
   // Try strict UTF-8 first; fall back to latin1 when bytes don't form valid UTF-8.
@@ -212,6 +217,7 @@ export function parseQuestionnaireSchedulesCsv(filePath: string): QuestionnaireS
     schedules.push({
       description: row[2],
       code: (row[3] || "").trim(),
+      isRecurring: parseRecurring(row[7] || ""),
       durationDays: Number(row[8]) || 365,
       periodCode: (row[11] || "").trim(),
       weekDays,
@@ -396,6 +402,7 @@ export function parseContentPlansCsv(filePath: string): ContentPlan[] {
 
     plans.push({
       description: row[2],
+      isRecurring: parseRecurring(row[7] || ""),
       durationDays: Number(row[8]) || 365,
       contentsPerDay: Number(row[19]) || 1,
       periodCode: (row[11] || "").trim(),
@@ -429,6 +436,7 @@ export function parseExercisePlansCsv(filePath: string): ExercisePlan[] {
 
     plans.push({
       description: row[2],
+      isRecurring: parseRecurring(row[7] || ""),
       durationDays: Number(row[8]) || 365,
       periodCode: (row[11] || "").trim(),
       weekDays,

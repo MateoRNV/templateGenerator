@@ -61,6 +61,7 @@ export interface NewContent {
 
 export interface ContentPlan {
   description: string;
+  isRecurring: boolean;
   durationDays: number;
   contentsPerDay: number;
   periodCode: string;
@@ -69,6 +70,7 @@ export interface ContentPlan {
 
 export interface ExercisePlan {
   description: string;
+  isRecurring: boolean;
   durationDays: number;
   periodCode: string;
   weekDays: WeekDaySchedule[];
@@ -77,6 +79,7 @@ export interface ExercisePlan {
 export interface QuestionnaireSchedule {
   description: string;
   code: string;
+  isRecurring: boolean;
   durationDays: number;
   periodCode: string;
   weekDays: WeekDaySchedule[];
