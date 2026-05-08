@@ -414,17 +414,17 @@ function runFullGeneration(): void {
 
       const parametrosSql = generateExerciciosParametrosSql(program.code, exerciseItems);
       if (parametrosSql) {
-        const parametrosPath = join(OUTPUT_DIR, `${group.label}_04-Exercicios-Parametros.sql`);
+        const parametrosPath = join(OUTPUT_DIR, `${group.label}_04.1-Exercicios-Parametros.sql`);
         const parametrosDelete = generateExerciciosParametrosDeleteSql(program.code);
-        writeSqlPair(parametrosPath, parametrosSql, join(DELETE_DIR, `${group.label}_04-Exercicios-Parametros.sql`), parametrosDelete);
+        writeSqlPair(parametrosPath, parametrosSql, join(DELETE_DIR, `${group.label}_04.1-Exercicios-Parametros.sql`), parametrosDelete);
         const totalParams = exerciseItems.reduce((acc, it) => acc + it.parameters.length, 0);
-        console.log(`  -> 04-Exercicios-Parametros.sql (${totalParams} parâmetro(s))`);
+        console.log(`  -> 04.1-Exercicios-Parametros.sql (${totalParams} parâmetro(s))`);
       } else {
-        console.log(`  -> 04-Exercicios-Parametros.sql ignorado (não foram encontrados valores de parâmetros)`);
+        console.log(`  -> 04.1-Exercicios-Parametros.sql ignorado (não foram encontrados valores de parâmetros)`);
       }
     } else {
       console.log(`  -> 04-Exercicios.sql ignorado (ficheiro Templates_exercicios não encontrado)`);
-      console.log(`  -> 04-Exercicios-Parametros.sql ignorado (ficheiro Templates_exercicios não encontrado)`);
+      console.log(`  -> 04.1-Exercicios-Parametros.sql ignorado (ficheiro Templates_exercicios não encontrado)`);
     }
   }
 

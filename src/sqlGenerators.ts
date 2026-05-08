@@ -686,7 +686,7 @@ VALUES (
 
 function templateExerciseItemLookup(item: TemplateExerciseItem, programCode: string): string {
   const planLookup = `(SELECT [Id] FROM [TemplatePhysicalRehabilitationPlan] WHERE [ProgramCode] = ${sqlString(programCode)} AND [Description] = ${sqlString(item.planDescription)})`;
-  return `(SELECT [Id] FROM [TemplatePhysicalRehabilitationItem] WHERE [Code] = ${sqlString(item.code)} AND [TemplatePhysicalRehabilitationPlanId] = ${planLookup})`;
+  return `(SELECT [Id] FROM [TemplatePhysicalRehabilitationItem] WHERE [PhysicalExerciseCode] = ${sqlString(item.code)} AND [TemplatePhysicalRehabilitationPlanId] = ${planLookup})`;
 }
 
 function generateTemplateExerciseItemParameterInsert(item: TemplateExerciseItem, programCode: string, parameterCode: string, value: number): string {
@@ -701,7 +701,7 @@ VALUES (
 );`;
 }
 
-// -- 04-Exercicios-Parametros.sql ---------------------------------------------
+// -- 04.1-Exercicios-Parametros.sql -------------------------------------------
 
 export function generateExerciciosParametrosSql(
   programCode: string,
@@ -989,7 +989,7 @@ DELETE FROM [dbo].[TemplatePhysicalRehabilitationItem] WHERE [TemplatePhysicalRe
 export function generateExerciciosParametrosDeleteSql(programCode: string): string {
   const pc = sqlString(programCode);
   return `-- =============================================
--- Rollback de 04-Exercicios-Parametros.sql para ProgramCode = ${pc}
+-- Rollback de 04.1-Exercicios-Parametros.sql para ProgramCode = ${pc}
 -- =============================================
 
 DELETE FROM [dbo].[TemplatePhysicalRehabilitationItemParameter] WHERE [TemplatePhysicalRehabilitationItemId] IN (SELECT [Id] FROM [dbo].[TemplatePhysicalRehabilitationItem] WHERE [TemplatePhysicalRehabilitationPlanId] IN (SELECT [Id] FROM [dbo].[TemplatePhysicalRehabilitationPlan] WHERE [ProgramCode] = ${pc}));`;
