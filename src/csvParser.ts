@@ -170,8 +170,9 @@ export function parseBiometricSchedulesCsv(filePath: string): BiometricSchedule[
     if (normalizeAccents(row[7] || "") !== "sim") continue;
 
     const weekDays: WeekDaySchedule[] = [];
-    for (let dayNumber = 1; dayNumber <= 7; dayNumber++) {
-      const cell = row[11 + dayNumber] || "";
+    for (let colIndex = 1; colIndex <= 7; colIndex++) {
+      const dayNumber = (colIndex % 7) + 1; // col 1=Seg→2, ..., col 6=Sab→7, col 7=Dom→1
+      const cell = row[11 + colIndex] || "";
       const times = cell.split("/").map((t) => t.trim()).filter((t) => timePattern.test(t));
       if (times.length === 0) continue;
       weekDays.push({ dayNumber, times });
@@ -200,8 +201,9 @@ export function parseQuestionnaireSchedulesCsv(filePath: string): QuestionnaireS
     if (!normalizeAccents(row[1]).includes("questi")) continue;
 
     const weekDays: WeekDaySchedule[] = [];
-    for (let dayNumber = 1; dayNumber <= 7; dayNumber++) {
-      const cell = row[11 + dayNumber] || "";
+    for (let colIndex = 1; colIndex <= 7; colIndex++) {
+      const dayNumber = (colIndex % 7) + 1; // col 1=Seg→2, ..., col 6=Sab→7, col 7=Dom→1
+      const cell = row[11 + colIndex] || "";
       const times = cell.split("/").map((t) => t.trim()).filter((t) => timePattern.test(t));
       if (times.length === 0) continue;
       weekDays.push({ dayNumber, times });
@@ -386,8 +388,9 @@ export function parseContentPlansCsv(filePath: string): ContentPlan[] {
     if (!normalizeAccents(row[1]).includes("conte")) continue;
 
     const activeDays: number[] = [];
-    for (let dayNumber = 1; dayNumber <= 7; dayNumber++) {
-      const cell = (row[11 + dayNumber] || "").trim();
+    for (let colIndex = 1; colIndex <= 7; colIndex++) {
+      const dayNumber = (colIndex % 7) + 1; // col 1=Seg→2, ..., col 6=Sab→7, col 7=Dom→1
+      const cell = (row[11 + colIndex] || "").trim();
       if (cell.length > 0) activeDays.push(dayNumber);
     }
 
@@ -416,8 +419,9 @@ export function parseExercisePlansCsv(filePath: string): ExercisePlan[] {
     if (!normalizeAccents(row[1]).includes("exerc")) continue;
 
     const weekDays: WeekDaySchedule[] = [];
-    for (let dayNumber = 1; dayNumber <= 7; dayNumber++) {
-      const cell = row[11 + dayNumber] || "";
+    for (let colIndex = 1; colIndex <= 7; colIndex++) {
+      const dayNumber = (colIndex % 7) + 1; // col 1=Seg→2, ..., col 6=Sab→7, col 7=Dom→1
+      const cell = row[11 + colIndex] || "";
       const times = cell.split("/").map((t) => t.trim()).filter((t) => timePattern.test(t));
       if (times.length === 0) continue;
       weekDays.push({ dayNumber, times });
