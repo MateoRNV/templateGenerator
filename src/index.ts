@@ -16,10 +16,24 @@ import {
   parseNovosQuestionariosCsv,
   parseQuestionnaireSchedulesCsv,
 } from "./csvParser.js";
-import { generateTemplateSql, generateBpSql, generatePreSql, generateContentSql, generateConteudosSql, generateExerciciosSql, generateExerciciosParametrosSql, generateQuestSql, wrapInTransaction } from "./sqlGenerators.js";
+import {
+  generateTemplateSql, generateBpSql, generatePreSql, generateContentSql,
+  generateConteudosSql, generateExerciciosSql, generateExerciciosParametrosSql,
+  generateQuestSql, wrapInTransaction,
+  generateTemplateDeleteSql, generateConteudosDeleteSql, generateExerciciosDeleteSql,
+  generateExerciciosParametrosDeleteSql, generateBpDeleteSql, generatePreDeleteSql,
+  generateContentDeleteSql, generateQuestDeleteSql,
+} from "./sqlGenerators.js";
 
 const CSV_DIR = join(import.meta.dirname, "..", "csv");
 const OUTPUT_DIR = join(import.meta.dirname, "..", "output");
+const DELETE_DIR = join(OUTPUT_DIR, "delete");
+
+function writeSqlPair(insertPath: string, insertSql: string, deletePath: string, deleteSql: string): void {
+  writeFileSync(insertPath, wrapInTransaction(insertSql), "utf-8");
+  mkdirSync(DELETE_DIR, { recursive: true });
+  writeFileSync(deletePath, wrapInTransaction(deleteSql), "utf-8");
+}
 
 interface CsvGroup {
   programFile: string;
@@ -154,7 +168,8 @@ function writeBpSql(novosFile: string, label: string): void {
     return;
   }
   const bpPath = join(OUTPUT_DIR, `${label}_01-BP.sql`);
-  writeFileSync(bpPath, wrapInTransaction(bpSql), "utf-8");
+  const bpDelete = generateBpDeleteSql(newParameters);
+  writeSqlPair(bpPath, bpSql, join(DELETE_DIR, `${label}_01-BP.sql`), bpDelete!);
   console.log(`  -> 01-BP.sql (${newParameters.length} new parameter(s))`);
 }
 
@@ -166,7 +181,8 @@ function writePreSql(novosExerciciosFile: string, label: string): void {
     return;
   }
   const prePath = join(OUTPUT_DIR, `${label}_01-PRE.sql`);
-  writeFileSync(prePath, wrapInTransaction(preSql), "utf-8");
+  const preDelete = generatePreDeleteSql(newExercises);
+  writeSqlPair(prePath, preSql, join(DELETE_DIR, `${label}_01-PRE.sql`), preDelete!);
   console.log(`  -> 01-PRE.sql (${newExercises.length} new exercise(s))`);
 }
 
@@ -178,7 +194,8 @@ function writeContentSql(novosConteudosFile: string, label: string): void {
     return;
   }
   const contentPath = join(OUTPUT_DIR, `${label}_01-Content.sql`);
-  writeFileSync(contentPath, wrapInTransaction(contentSql), "utf-8");
+  const contentDelete = generateContentDeleteSql(newContents);
+  writeSqlPair(contentPath, contentSql, join(DELETE_DIR, `${label}_01-Content.sql`), contentDelete!);
   console.log(`  -> 01-Content.sql (${newContents.length} new content(s))`);
 }
 
@@ -190,7 +207,8 @@ function writeQuestSql(novosQuestionariosFile: string, label: string): void {
     return;
   }
   const questPath = join(OUTPUT_DIR, `${label}_01-Quest.sql`);
-  writeFileSync(questPath, wrapInTransaction(questSql), "utf-8");
+  const questDelete = generateQuestDeleteSql(questionnaires);
+  writeSqlPair(questPath, questSql, join(DELETE_DIR, `${label}_01-Quest.sql`), questDelete!);
   const totalQuestions = questionnaires.reduce((acc, q) => acc + q.questions.length, 0);
   console.log(`  -> 01-Quest.sql (${questionnaires.length} questionnaire(s), ${totalQuestions} question(s))`);
 }
@@ -367,7 +385,8 @@ function runFullGeneration(): void {
 
     const templateSql = generateTemplateSql(program, parameters, schedules, questionnaireSchedules, predefinedQuestionnaires, exercisePlans, contentPlans);
     const templatePath = join(OUTPUT_DIR, `${group.label}_02-Template.sql`);
-    writeFileSync(templatePath, wrapInTransaction(templateSql), "utf-8");
+    const templateDelete = generateTemplateDeleteSql(program.code);
+    writeSqlPair(templatePath, templateSql, join(DELETE_DIR, `${group.label}_02-Template.sql`), templateDelete);
     console.log(`  -> 02-Template.sql`);
 
     if (group.contentsFile) {
@@ -376,7 +395,8 @@ function runFullGeneration(): void {
 
       const conteudosSql = generateConteudosSql(program.code, items);
       const conteudosPath = join(OUTPUT_DIR, `${group.label}_03-Conteudos.sql`);
-      writeFileSync(conteudosPath, wrapInTransaction(conteudosSql), "utf-8");
+      const conteudosDelete = generateConteudosDeleteSql(program.code);
+      writeSqlPair(conteudosPath, conteudosSql, join(DELETE_DIR, `${group.label}_03-Conteudos.sql`), conteudosDelete);
       console.log(`  -> 03-Conteudos.sql`);
     } else {
       console.log(`  -> 03-Conteudos.sql ignorado (ficheiro Template_conteudos não encontrado)`);
@@ -388,13 +408,15 @@ function runFullGeneration(): void {
 
       const exerciciosSql = generateExerciciosSql(program.code, exerciseItems);
       const exerciciosPath = join(OUTPUT_DIR, `${group.label}_04-Exercicios.sql`);
-      writeFileSync(exerciciosPath, wrapInTransaction(exerciciosSql), "utf-8");
+      const exerciciosDelete = generateExerciciosDeleteSql(program.code);
+      writeSqlPair(exerciciosPath, exerciciosSql, join(DELETE_DIR, `${group.label}_04-Exercicios.sql`), exerciciosDelete);
       console.log(`  -> 04-Exercicios.sql`);
 
       const parametrosSql = generateExerciciosParametrosSql(program.code, exerciseItems);
       if (parametrosSql) {
         const parametrosPath = join(OUTPUT_DIR, `${group.label}_04-Exercicios-Parametros.sql`);
-        writeFileSync(parametrosPath, wrapInTransaction(parametrosSql), "utf-8");
+        const parametrosDelete = generateExerciciosParametrosDeleteSql(program.code);
+        writeSqlPair(parametrosPath, parametrosSql, join(DELETE_DIR, `${group.label}_04-Exercicios-Parametros.sql`), parametrosDelete);
         const totalParams = exerciseItems.reduce((acc, it) => acc + it.parameters.length, 0);
         console.log(`  -> 04-Exercicios-Parametros.sql (${totalParams} parâmetro(s))`);
       } else {

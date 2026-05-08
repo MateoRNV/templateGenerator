@@ -927,3 +927,137 @@ export function generateQuestSql(questionnaires: PredefinedQuestionnaire[]): str
   return lines.join("\n");
 }
 
+// =============================================================================
+// DELETE script generators (rollback de cada archivo INSERT)
+// =============================================================================
+
+function inList(values: string[]): string {
+  return values.map(sqlString).join(", ");
+}
+
+export function generateTemplateDeleteSql(programCode: string): string {
+  const pc = sqlString(programCode);
+  return `-- =============================================
+-- Rollback de 02-Template.sql para ProgramCode = ${pc}
+-- =============================================
+
+-- 1. Educational Content (plan-level)
+DELETE FROM [dbo].[TemplateEducationalContentWeekDay] WHERE [TemplateEducationalContentPlanId] IN (SELECT [Id] FROM [dbo].[TemplateEducationalContentPlan] WHERE [ProgramCode] = ${pc});
+DELETE FROM [dbo].[TemplateEducationalContentPeriod] WHERE [TemplateEducationalContentPlanId] IN (SELECT [Id] FROM [dbo].[TemplateEducationalContentPlan] WHERE [ProgramCode] = ${pc});
+DELETE FROM [dbo].[TemplateEducationalContentPlan] WHERE [ProgramCode] = ${pc};
+
+-- 2. Physical Rehabilitation (plan-level)
+DELETE FROM [dbo].[TemplatePhysicalRehabilitationWeekDayTimer] WHERE [TemplatePhysicalRehabilitationWeekDayId] IN (SELECT [Id] FROM [dbo].[TemplatePhysicalRehabilitationWeekDay] WHERE [TemplatePhysicalRehabilitationPlanId] IN (SELECT [Id] FROM [dbo].[TemplatePhysicalRehabilitationPlan] WHERE [ProgramCode] = ${pc}));
+DELETE FROM [dbo].[TemplatePhysicalRehabilitationWeekDay] WHERE [TemplatePhysicalRehabilitationPlanId] IN (SELECT [Id] FROM [dbo].[TemplatePhysicalRehabilitationPlan] WHERE [ProgramCode] = ${pc});
+DELETE FROM [dbo].[TemplatePhysicalRehabilitationPeriod] WHERE [TemplatePhysicalRehabilitationPlanId] IN (SELECT [Id] FROM [dbo].[TemplatePhysicalRehabilitationPlan] WHERE [ProgramCode] = ${pc});
+DELETE FROM [dbo].[TemplatePhysicalRehabilitationPlan] WHERE [ProgramCode] = ${pc};
+
+-- 3. Questionnaires
+DELETE FROM [dbo].[TemplateQuestionnaireWeekDayTimer] WHERE [TemplateQuestionnaireWeekDayId] IN (SELECT [Id] FROM [dbo].[TemplateQuestionnaireWeekDay] WHERE [TemplateQuestionnaireId] IN (SELECT [Id] FROM [dbo].[TemplateQuestionnaire] WHERE [ProgramCode] = ${pc}));
+DELETE FROM [dbo].[TemplateQuestionnaireWeekDay] WHERE [TemplateQuestionnaireId] IN (SELECT [Id] FROM [dbo].[TemplateQuestionnaire] WHERE [ProgramCode] = ${pc});
+DELETE FROM [dbo].[TemplateQuestionnairePeriod] WHERE [TemplateQuestionnaireId] IN (SELECT [Id] FROM [dbo].[TemplateQuestionnaire] WHERE [ProgramCode] = ${pc});
+DELETE FROM [dbo].[TemplateQuestionnaire] WHERE [ProgramCode] = ${pc};
+
+-- 4. Biometric Parameters
+DELETE FROM [dbo].[TemplateBiometricParameterWeekDayTimer] WHERE [TemplateBiometricParameterWeekDayId] IN (SELECT [Id] FROM [dbo].[TemplateBiometricParameterWeekDay] WHERE [TemplateBiometricParameterId] IN (SELECT [Id] FROM [dbo].[TemplateBiometricParameter] WHERE [ProgramCode] = ${pc}));
+DELETE FROM [dbo].[TemplateBiometricParameterWeekDay] WHERE [TemplateBiometricParameterId] IN (SELECT [Id] FROM [dbo].[TemplateBiometricParameter] WHERE [ProgramCode] = ${pc});
+DELETE FROM [dbo].[TemplateBiometricParameterPeriod] WHERE [TemplateBiometricParameterId] IN (SELECT [Id] FROM [dbo].[TemplateBiometricParameter] WHERE [ProgramCode] = ${pc});
+DELETE FROM [dbo].[TemplateBiometricParameter] WHERE [ProgramCode] = ${pc};
+
+-- 5. Template raíz
+DELETE FROM [dbo].[Template] WHERE [ProgramCode] = ${pc};`;
+}
+
+export function generateConteudosDeleteSql(programCode: string): string {
+  const pc = sqlString(programCode);
+  return `-- =============================================
+-- Rollback de 03-Conteudos.sql para ProgramCode = ${pc}
+-- =============================================
+
+DELETE FROM [dbo].[TemplateEducationalContentItem] WHERE [TemplateEducationalContentPlanId] IN (SELECT [Id] FROM [dbo].[TemplateEducationalContentPlan] WHERE [ProgramCode] = ${pc});`;
+}
+
+export function generateExerciciosDeleteSql(programCode: string): string {
+  const pc = sqlString(programCode);
+  return `-- =============================================
+-- Rollback de 04-Exercicios.sql para ProgramCode = ${pc}
+-- =============================================
+
+DELETE FROM [dbo].[TemplatePhysicalRehabilitationItem] WHERE [TemplatePhysicalRehabilitationPlanId] IN (SELECT [Id] FROM [dbo].[TemplatePhysicalRehabilitationPlan] WHERE [ProgramCode] = ${pc});`;
+}
+
+export function generateExerciciosParametrosDeleteSql(programCode: string): string {
+  const pc = sqlString(programCode);
+  return `-- =============================================
+-- Rollback de 04-Exercicios-Parametros.sql para ProgramCode = ${pc}
+-- =============================================
+
+DELETE FROM [dbo].[TemplatePhysicalRehabilitationItemParameter] WHERE [TemplatePhysicalRehabilitationItemId] IN (SELECT [Id] FROM [dbo].[TemplatePhysicalRehabilitationItem] WHERE [TemplatePhysicalRehabilitationPlanId] IN (SELECT [Id] FROM [dbo].[TemplatePhysicalRehabilitationPlan] WHERE [ProgramCode] = ${pc}));`;
+}
+
+export function generateBpDeleteSql(newParameters: NewParameter[]): string | null {
+  if (newParameters.length === 0) return null;
+  const codes = inList(newParameters.map(p => p.code));
+  return `-- =============================================
+-- Rollback de 01-BP.sql (ClinicalDataType catalog)
+-- =============================================
+
+DELETE FROM [dbo].[ClinicalDataType] WHERE [Code] IN (${codes});`;
+}
+
+export function generatePreDeleteSql(exercises: NewExercise[]): string | null {
+  if (exercises.length === 0) return null;
+  const codes = inList(exercises.map(e => e.code));
+  return `-- =============================================
+-- Rollback de 01-PRE.sql (PRePhysicalExercise catalog)
+-- =============================================
+
+DELETE FROM [dbo].[PRePhysicalExercise] WHERE [Code] IN (${codes});`;
+}
+
+export function generateContentDeleteSql(items: NewContent[]): string | null {
+  if (items.length === 0) return null;
+  const codes = inList(items.map(i => i.code));
+  return `-- =============================================
+-- Rollback de 01-Content.sql (EducationalContent.Item catalog)
+-- =============================================
+
+DELETE FROM [EducationalContent].[Item] WHERE [Code] IN (${codes});`;
+}
+
+export function generateQuestDeleteSql(questionnaires: PredefinedQuestionnaire[]): string | null {
+  if (questionnaires.length === 0) return null;
+
+  const questionnaireCodes = inList(questionnaires.map(q => q.code));
+  const questionCodes = new Set<string>();
+  const newAnswerCodes = new Set<string>();
+  for (const q of questionnaires) {
+    for (const question of q.questions) {
+      questionCodes.add(question.code);
+      if (question.newAnswerKeys) {
+        for (const key of question.answerKeys) newAnswerCodes.add(key.code);
+      }
+    }
+  }
+
+  const lines: string[] = [
+    `-- =============================================`,
+    `-- Rollback de 01-Quest.sql (ProfessionalQuestionnaire catalog)`,
+    `-- =============================================`,
+    ``,
+    `DELETE FROM [dbo].[ProfessionalQuestionnaireQuestion] WHERE [ProfessionalQuestionnaireId] IN (SELECT [Id] FROM [dbo].[ProfessionalQuestionnaire] WHERE [Code] IN (${questionnaireCodes}));`,
+    `DELETE FROM [dbo].[ProfessionalQuestionnaire] WHERE [Code] IN (${questionnaireCodes});`,
+  ];
+
+  if (questionCodes.size > 0) {
+    const qList = inList([...questionCodes]);
+    lines.push(`DELETE FROM [dbo].[QuestionAnswer] WHERE [QuestionId] IN (SELECT [Id] FROM [dbo].[Question] WHERE [Code] IN (${qList}));`);
+    lines.push(`DELETE FROM [dbo].[Question] WHERE [Code] IN (${qList});`);
+  }
+
+  if (newAnswerCodes.size > 0) {
+    lines.push(`DELETE FROM [dbo].[Answer] WHERE [Code] IN (${inList([...newAnswerCodes])});`);
+  }
+
+  return lines.join("\n");
+}
