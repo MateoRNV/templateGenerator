@@ -16,7 +16,7 @@ import {
   parseNovosQuestionariosCsv,
   parseQuestionnaireSchedulesCsv,
 } from "./csvParser.js";
-import { generateTemplateSql, generateBpSql, generatePreSql, generateContentSql, generateConteudosSql, generateExerciciosSql, generateExerciciosParametrosSql, generateQuestSql } from "./sqlGenerators.js";
+import { generateTemplateSql, generateBpSql, generatePreSql, generateContentSql, generateConteudosSql, generateExerciciosSql, generateExerciciosParametrosSql, generateQuestSql, wrapInTransaction } from "./sqlGenerators.js";
 
 const CSV_DIR = join(import.meta.dirname, "..", "csv");
 const OUTPUT_DIR = join(import.meta.dirname, "..", "output");
@@ -154,7 +154,7 @@ function writeBpSql(novosFile: string, label: string): void {
     return;
   }
   const bpPath = join(OUTPUT_DIR, `${label}_01-BP.sql`);
-  writeFileSync(bpPath, bpSql, "utf-8");
+  writeFileSync(bpPath, wrapInTransaction(bpSql), "utf-8");
   console.log(`  -> 01-BP.sql (${newParameters.length} new parameter(s))`);
 }
 
@@ -166,7 +166,7 @@ function writePreSql(novosExerciciosFile: string, label: string): void {
     return;
   }
   const prePath = join(OUTPUT_DIR, `${label}_01-PRE.sql`);
-  writeFileSync(prePath, preSql, "utf-8");
+  writeFileSync(prePath, wrapInTransaction(preSql), "utf-8");
   console.log(`  -> 01-PRE.sql (${newExercises.length} new exercise(s))`);
 }
 
@@ -178,7 +178,7 @@ function writeContentSql(novosConteudosFile: string, label: string): void {
     return;
   }
   const contentPath = join(OUTPUT_DIR, `${label}_01-Content.sql`);
-  writeFileSync(contentPath, contentSql, "utf-8");
+  writeFileSync(contentPath, wrapInTransaction(contentSql), "utf-8");
   console.log(`  -> 01-Content.sql (${newContents.length} new content(s))`);
 }
 
@@ -190,7 +190,7 @@ function writeQuestSql(novosQuestionariosFile: string, label: string): void {
     return;
   }
   const questPath = join(OUTPUT_DIR, `${label}_01-Quest.sql`);
-  writeFileSync(questPath, questSql, "utf-8");
+  writeFileSync(questPath, wrapInTransaction(questSql), "utf-8");
   const totalQuestions = questionnaires.reduce((acc, q) => acc + q.questions.length, 0);
   console.log(`  -> 01-Quest.sql (${questionnaires.length} questionnaire(s), ${totalQuestions} question(s))`);
 }
@@ -367,7 +367,7 @@ function runFullGeneration(): void {
 
     const templateSql = generateTemplateSql(program, parameters, schedules, questionnaireSchedules, predefinedQuestionnaires, exercisePlans, contentPlans);
     const templatePath = join(OUTPUT_DIR, `${group.label}_02-Template.sql`);
-    writeFileSync(templatePath, templateSql, "utf-8");
+    writeFileSync(templatePath, wrapInTransaction(templateSql), "utf-8");
     console.log(`  -> 02-Template.sql`);
 
     if (group.contentsFile) {
@@ -376,7 +376,7 @@ function runFullGeneration(): void {
 
       const conteudosSql = generateConteudosSql(program.code, items);
       const conteudosPath = join(OUTPUT_DIR, `${group.label}_03-Conteudos.sql`);
-      writeFileSync(conteudosPath, conteudosSql, "utf-8");
+      writeFileSync(conteudosPath, wrapInTransaction(conteudosSql), "utf-8");
       console.log(`  -> 03-Conteudos.sql`);
     } else {
       console.log(`  -> 03-Conteudos.sql ignorado (ficheiro Template_conteudos não encontrado)`);
@@ -388,13 +388,13 @@ function runFullGeneration(): void {
 
       const exerciciosSql = generateExerciciosSql(program.code, exerciseItems);
       const exerciciosPath = join(OUTPUT_DIR, `${group.label}_04-Exercicios.sql`);
-      writeFileSync(exerciciosPath, exerciciosSql, "utf-8");
+      writeFileSync(exerciciosPath, wrapInTransaction(exerciciosSql), "utf-8");
       console.log(`  -> 04-Exercicios.sql`);
 
       const parametrosSql = generateExerciciosParametrosSql(program.code, exerciseItems);
       if (parametrosSql) {
         const parametrosPath = join(OUTPUT_DIR, `${group.label}_04-Exercicios-Parametros.sql`);
-        writeFileSync(parametrosPath, parametrosSql, "utf-8");
+        writeFileSync(parametrosPath, wrapInTransaction(parametrosSql), "utf-8");
         const totalParams = exerciseItems.reduce((acc, it) => acc + it.parameters.length, 0);
         console.log(`  -> 04-Exercicios-Parametros.sql (${totalParams} parâmetro(s))`);
       } else {

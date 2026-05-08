@@ -12,6 +12,22 @@ function splitPeriodCodes(periodCode: string): string[] {
   return periodCode.split(",").map(p => p.trim()).filter(p => p.length > 0);
 }
 
+export function wrapInTransaction(sql: string): string {
+  return `BEGIN TRY
+    BEGIN TRANSACTION;
+
+${sql}
+
+    COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0
+        ROLLBACK TRANSACTION;
+    THROW;
+END CATCH
+GO`;
+}
+
 // -- Template INSERT -----------------------------------------------------------
 
 function generateTemplateInsert(program: ProgramData): string {
