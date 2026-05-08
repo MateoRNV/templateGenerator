@@ -19,10 +19,12 @@ export function wrapInTransaction(sql: string): string {
 ${sql}
 
     COMMIT TRANSACTION;
+    PRINT 'Script ejecutado con éxito.';
 END TRY
 BEGIN CATCH
     IF @@TRANCOUNT > 0
         ROLLBACK TRANSACTION;
+    PRINT 'Error detectado. Se hizo ROLLBACK de toda la transacción.';
     THROW;
 END CATCH
 GO`;
@@ -379,7 +381,6 @@ export function generateTemplateSql(
     lines.push(`-- =============================================`);
     lines.push(`-- Biometric Parameters: ${param.name} (${param.code})`);
     lines.push(`-- =============================================`);
-    lines.push("GO");
     lines.push(generateBiometricParameterInsert(param, program.code));
 
     if (!param.isRecurring) continue;
@@ -416,7 +417,6 @@ export function generateTemplateSql(
     lines.push(`-- =============================================`);
     lines.push(`-- Questionarios: ${q.description}`);
     lines.push(`-- =============================================`);
-    lines.push("GO");
     lines.push(generateTemplateQuestionnaireInsert(program.code, q));
 
     if (q.schedule.periodCode) {
@@ -448,7 +448,6 @@ export function generateTemplateSql(
     lines.push(`-- =============================================`);
     lines.push(`-- Exercicios: ${plan.description}`);
     lines.push(`-- =============================================`);
-    lines.push("GO");
     lines.push(generateExercisePlanInsert(program.code, plan));
 
     if (plan.periodCode) {
@@ -480,7 +479,6 @@ export function generateTemplateSql(
     lines.push(`-- =============================================`);
     lines.push(`-- Educational Content Plans: ${plan.description}`);
     lines.push(`-- =============================================`);
-    lines.push("GO");
     lines.push(generateEducationalContentPlanInsert(program.code, plan));
 
     if (plan.periodCode) {
@@ -519,11 +517,10 @@ export function generateBpSql(
   ];
 
   newParameters.forEach((param, index) => {
-    if (index > 0) lines.push("", "GO");
     lines.push("", generateClinicalDataTypeInsert(param, index + 1));
   });
 
-  lines.push("", "GO", "");
+  lines.push("");
   return lines.join("\n");
 }
 
@@ -563,11 +560,10 @@ export function generatePreSql(exercises: NewExercise[]): string | null {
   ];
 
   exercises.forEach((exercise, index) => {
-    if (index > 0) lines.push("", "GO");
     lines.push("", generatePreExerciseInsert(exercise));
   });
 
-  lines.push("", "GO", "");
+  lines.push("");
   return lines.join("\n");
 }
 
@@ -606,11 +602,10 @@ export function generateContentSql(items: NewContent[]): string | null {
   ];
 
   items.forEach((item, index) => {
-    if (index > 0) lines.push("", "GO");
     lines.push("", generateEducationalContentItemCatalogInsert(item));
   });
 
-  lines.push("", "GO", "");
+  lines.push("");
   return lines.join("\n");
 }
 
@@ -904,21 +899,18 @@ export function generateQuestSql(questionnaires: PredefinedQuestionnaire[]): str
           if (emittedAnswerCodes.has(key.code)) continue;
           emittedAnswerCodes.add(key.code);
           lines.push(generateAnswerInsert(key));
-          lines.push("GO");
         }
       }
 
       lines.push("");
       lines.push("-- Question");
       lines.push(generateQuestionInsert(question));
-      lines.push("GO");
 
       if (question.answerKeys.length > 0) {
         lines.push("");
         lines.push("-- Question Answers");
         for (const key of question.answerKeys) {
           lines.push(generateQuestionAnswerInsert(question.code, key));
-          lines.push("GO");
         }
       }
     }
@@ -926,13 +918,11 @@ export function generateQuestSql(questionnaires: PredefinedQuestionnaire[]): str
     lines.push("");
     lines.push("-- Professional Questionnaire");
     lines.push(generateProfessionalQuestionnaireInsert(q));
-    lines.push("GO");
 
     lines.push("");
     lines.push("-- Professional Questionnaire Questions");
     for (const question of q.questions) {
       lines.push(generateProfessionalQuestionnaireQuestionInsert(question, q.code));
-      lines.push("GO");
     }
 
     lines.push("");
