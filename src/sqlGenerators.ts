@@ -539,8 +539,8 @@ VALUES (
     ,1 -- isActive
     ,'00000000-0000-0000-0000-000000000000' -- createBy
     ,SYSDATETIME() -- createDateTime
-    ,'00000000-0000-0000-0000-000000000000' -- modifyBy
-    ,SYSDATETIME() -- modifyDateTime
+    ,NULL -- modifyBy
+    ,NULL -- modifyDateTime
     ,${exercise.order} -- order
     ,${exercise.objective ? sqlString(exercise.objective) : "NULL"} -- objective
     ,${exercise.instructions ? sqlString(exercise.instructions) : "NULL"} -- instructions

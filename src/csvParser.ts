@@ -589,45 +589,46 @@ function parseBoolish(value: string): boolean {
 
 export function parseNovosQuestionariosCsv(filePath: string): PredefinedQuestionnaire[] {
   const rows = readCsvFile(filePath);
-  // Header row 0: 22 columns. Key indices used:
-  //  1=Questionario, 2=Code Questionario, 3=Instrução, 5=Título questão, 7=Description Questao,
-  //  8=Code Questão, 9=Ordem Questão, 10=Instrução questão, 12=QuestionNumber QuestionnaireQuestion,
-  //  14=Chaves de resposta, 15=Chaves de resposta New, 17=Tipo, 18=Score mínimo, 19=Score máximo,
-  //  21=Ad-hoc.
+  // Header row 0 (0-indexed):
+  //  0=Questionario, 1=Code Questionario, 2=Instrução, 3=Categorias,
+  //  4=Título questão, 5=Description Questao, 6=Code Questão, 7=Ordem Questão,
+  //  8=Instrução questão, 9=Subtitulo, 10=QuestionNumber, 11=Order QuestionnaireQuestion,
+  //  12=Chaves de resposta, 13=Chaves de resposta New, 14=Condição de resposta,
+  //  15=Tipo, 16=Score mínimo, 17=Score máximo, 18=Programas, 19=Ad-hoc
 
   const byCode = new Map<string, PredefinedQuestionnaire>();
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
-    const questionnaireCode = collapseWhitespace(row[2] || "");
-    const questionCode = collapseWhitespace(row[8] || "");
+    const questionnaireCode = collapseWhitespace(row[1] || "");
+    const questionCode = collapseWhitespace(row[6] || "");
     if (!questionnaireCode || !questionCode) continue;
 
     let q = byCode.get(questionnaireCode);
     if (!q) {
       q = {
-        description: collapseWhitespace(row[1] || ""),
+        description: collapseWhitespace(row[0] || ""),
         code: questionnaireCode,
-        instructions: collapseWhitespace(row[3] || ""),
+        instructions: collapseWhitespace(row[2] || ""),
         questions: [],
       };
       byCode.set(questionnaireCode, q);
     }
 
-    const useInCustom = parseNum(row[21]);
+    const useInCustom = parseNum(row[19]);
     q.questions.push({
-      title: collapseWhitespace(row[5] || ""),
-      description: collapseWhitespace(row[7] || ""),
+      title: collapseWhitespace(row[4] || ""),
+      description: collapseWhitespace(row[5] || ""),
       code: questionCode,
-      order: parseNum(row[9]),
-      instructions: collapseWhitespace(row[10] || ""),
-      questionNumber: collapseWhitespace(row[12] || ""),
-      responseKeyType: collapseWhitespace(row[17] || "").toUpperCase(),
-      minValue: parseNum(row[18]),
-      maxValue: parseNum(row[19]),
+      order: parseNum(row[7]),
+      instructions: collapseWhitespace(row[8] || ""),
+      questionNumber: collapseWhitespace(row[10] || ""),
+      responseKeyType: collapseWhitespace(row[15] || "").toUpperCase(),
+      minValue: parseNum(row[16]),
+      maxValue: parseNum(row[17]),
       useInCustomQuestionnaire: useInCustom != null ? useInCustom : 0,
-      answerKeys: parseAnswerKeys(row[14] || ""),
-      newAnswerKeys: parseBoolish(row[15] || ""),
+      answerKeys: parseAnswerKeys(row[12] || ""),
+      newAnswerKeys: parseBoolish(row[13] || ""),
     });
   }
 
