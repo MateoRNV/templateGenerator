@@ -30,6 +30,39 @@ END CATCH
 GO`;
 }
 
+// -- Program INSERT ------------------------------------------------------------
+
+export function generateProgramSql(program: ProgramData): string {
+  return `-- =============================================
+-- Program: ${program.name} (${program.code})
+-- =============================================
+
+INSERT INTO [dbo].[Program] ([Id] ,[Code] ,[Description] ,[Order] ,[HealthTypeExternalId] ,[HealthSpecialtyExternalId] ,[IsActive] ,[ShortDescription] ,[CodeTM] ,[IsLocal] ,[DefaultProfessionalId] ,[DefaultOrganizationId])
+VALUES (
+    NEWID() --id
+    ,${sqlString(program.code)} --code
+    ,${sqlString(program.name)} --description
+    ,${program.order} --order
+    ,1 --healthTypeExternalId
+    ,1 --healthSpecialtyExternalId
+    ,1 --isActive
+    ,${sqlString(program.shortDescription)} --shortDescription
+    ,${sqlString(program.code)} --codeTM
+    ,1 --isLocal
+    ,NULL --defaultProfessionalId
+    ,NULL --defaultOrganizationId
+);`;
+}
+
+export function generateProgramDeleteSql(program: ProgramData): string {
+  const pc = sqlString(program.code);
+  return `-- =============================================
+-- Rollback de 02-Program.sql para Code = ${pc}
+-- =============================================
+
+DELETE FROM [dbo].[Program] WHERE [Code] = ${pc};`;
+}
+
 // -- Template INSERT -----------------------------------------------------------
 
 function generateTemplateInsert(program: ProgramData): string {

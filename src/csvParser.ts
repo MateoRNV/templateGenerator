@@ -117,10 +117,14 @@ export function parseProgramCsv(filePath: string): ProgramData {
   }
 
   const data = rows[1];
+  const name = data[0] || "";
+  const shortDescription = (data[3] || "").trim() || name;
   return {
-    name: data[0],
+    name,
     isShareable: data[1].toLowerCase() === "sim",
     code: data[2],
+    shortDescription,
+    order: Number(data[4]) || 3,
   };
 }
 

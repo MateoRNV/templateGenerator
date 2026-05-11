@@ -2,6 +2,8 @@ export interface ProgramData {
   name: string;
   isShareable: boolean;
   code: string;
+  shortDescription: string;
+  order: number;
 }
 
 export interface TemplateParameter {

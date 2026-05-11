@@ -17,6 +17,7 @@ import {
   parseQuestionnaireSchedulesCsv,
 } from "./csvParser.js";
 import {
+  generateProgramSql, generateProgramDeleteSql,
   generateTemplateSql, generateBpSql, generatePreSql, generateContentSql,
   generateConteudosSql, generateExerciciosSql, generateExerciciosParametrosSql,
   generateQuestSql, wrapInTransaction,
@@ -382,6 +383,12 @@ function runFullGeneration(): void {
       }
       conteudosEmitted = true;
     }
+
+    const programSql = generateProgramSql(program);
+    const programPath = join(OUTPUT_DIR, `${group.label}_02-Program.sql`);
+    const programDelete = generateProgramDeleteSql(program);
+    writeSqlPair(programPath, programSql, join(DELETE_DIR, `${group.label}_02-Program.sql`), programDelete);
+    console.log(`  -> 02-Program.sql`);
 
     const templateSql = generateTemplateSql(program, parameters, schedules, questionnaireSchedules, predefinedQuestionnaires, exercisePlans, contentPlans);
     const templatePath = join(OUTPUT_DIR, `${group.label}_02-Template.sql`);
