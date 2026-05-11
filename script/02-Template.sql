@@ -1,3 +1,36 @@
+SELECT TOP (1000) [Id]
+      ,[Code]
+      ,[Description]
+      ,[Order]
+      ,[HealthTypeExternalId]
+      ,[HealthSpecialtyExternalId]
+      ,[IsActive]
+      ,[ShortDescription]
+      ,[CodeTM]
+      ,[IsLocal]
+      ,[DefaultProfessionalId]
+      ,[DefaultOrganizationId]
+  FROM [dbo].[Program]
+
+  INSERT INTO [dbo].[Program]
+([Id], [Code], [Description], [Order], [HealthTypeExternalId], [HealthSpecialtyExternalId], [IsActive], [ShortDescription], [CodeTM], [IsLocal], [DefaultProfessionalId], [DefaultOrganizationId])
+VALUES (
+    NEWID(),    -- Id (será gerado automaticamente)
+    'DMT3',                                   -- Code
+    'Teste DMT3',                                    -- Description
+    13,                                         -- Order
+    1,                                       -- HealthTypeExternalId (se aplicável)
+    1,                                       -- HealthSpecialtyExternalId (se aplicável)
+    1,                                          -- IsActive
+    'Teste DMT3',                                       -- ShortDescription
+    'DMT3',                                       -- CodeTM (se aplicável)
+    1,                                          -- IsLocal
+    NULL,                                       -- DefaultProfessionalId (se aplicável)
+    NULL                                        -- DefaultOrganizationId (se aplicável)
+);
+
+
+
 -- =============================================
 -- Template: Reabilitação Vocal (VOCAL-REHAB)
 -- =============================================
