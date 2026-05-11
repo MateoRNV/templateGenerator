@@ -784,7 +784,7 @@ VALUES (
     ,1 --isActive
     ,${SYSTEM_USER} --createBy
     ,SYSDATETIME() --createDateTime
-    ,${SYSTEM_USER} --modifyBy
+    ,NULL --modifyBy
     ,NULL --modifyDateTime
     ,NULL --endValue
     ,NULL --score
@@ -809,7 +809,7 @@ VALUES (
     ,1 --isActive
     ,${SYSTEM_USER} --createBy
     ,SYSDATETIME() --createDateTime
-    ,${SYSTEM_USER} --modifyBy
+    ,NULL --modifyBy
     ,NULL --modifyDateTime
     ,'${dataType}' --dataType
     ,${instructions} --instructions
@@ -832,7 +832,7 @@ VALUES (
     ,1 --isActive
     ,${SYSTEM_USER} --createBy
     ,SYSDATETIME() --createDateTime
-    ,${SYSTEM_USER} --modifyBy
+    ,NULL --modifyBy
     ,NULL --modifyDateTime
 );`;
 }
