@@ -1,4 +1,4 @@
-import type { ProgramData, TemplateParameter, NewParameter, NewExercise, NewContent, BiometricSchedule, ContentPlan, ExercisePlan, EducationalContentItem, TemplateExerciseItem, AnswerKey, PredefinedQuestion, PredefinedQuestionnaire, QuestionnaireSchedule } from "./types.js";
+import type { ProgramData, TemplateParameter, NewParameter, NewExercise, NewContent, BiometricSchedule, ContentPlan, ExercisePlan, EducationalContentItem, TemplateExerciseItem, AnswerKey, PredefinedQuestion, PredefinedQuestionnaire, QuestionnaireSchedule, AlertRule } from "./types.js";
 
 function sqlString(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
@@ -1121,4 +1121,105 @@ export function generateQuestDeleteSql(questionnaires: PredefinedQuestionnaire[]
   }
 
   return lines.join("\n");
+}
+
+// =============================================================================
+// 06-Regras-de-alerta.sql
+// =============================================================================
+
+function alertBiometricLookup(code: string, programCode: string): string {
+  return `(SELECT [Id] FROM [dbo].[TemplateBiometricParameter] WHERE [Code] = ${sqlString(code)} AND [ProgramCode] = ${sqlString(programCode)})`;
+}
+
+function alertQuestionnaireLookup(code: string, programCode: string): string {
+  return `(SELECT [Id] FROM [dbo].[TemplateQuestionnaire] WHERE [Code] = ${sqlString(code)} AND [ProgramCode] = ${sqlString(programCode)})`;
+}
+
+function generateAlertRuleInsert(rule: AlertRule, programCode: string): string {
+  const templateLookup = `(SELECT [Id] FROM [dbo].[Template] WHERE [ProgramCode] = ${sqlString(programCode)})`;
+  const severityCode = sqlString(rule.severityCode);
+  const value = isNaN(Number(rule.value)) ? sqlString(rule.value) : rule.value;
+
+  if (rule.prescriptionType === "biometric") {
+    const paramLookup = alertBiometricLookup(rule.code, programCode);
+    const alertLookup = `(SELECT [Id] FROM [dbo].[TemplateBiometricParameterAlert] WHERE [CodeSeverity] = ${severityCode} AND [TemplateBiometricParameterId] = ${paramLookup})`;
+    return `-- ${rule.code} - ${rule.operator} - ${rule.value}
+INSERT INTO [dbo].[TemplateBiometricParameterAlert] ([Id] ,[TemplateBiometricParameterId] ,[CodeSeverity] ,[GroupId] ,[Snomed] ,[IsActive] ,[TemplateId])
+VALUES (
+    NEWID() --id
+    ,${paramLookup} --templateBiometricParameterId
+    ,${severityCode} --codeSeverity
+    ,NULL --groupId
+    ,NULL --snomed
+    ,1 --isActive
+    ,${templateLookup} --templateId
+);
+INSERT INTO [dbo].[TemplateItemBiometricParameterAlert] ([Id] ,[TemplateBiometricParameterAlertId] ,[CodeSnomed] ,[CodeAlertCondition] ,[Value] ,[IsActive] ,[Code])
+VALUES (
+    NEWID() --id
+    ,${alertLookup} --templateBiometricParameterAlertId
+    ,NULL --codeSnomed
+    ,${sqlString(rule.operator)} --codeAlertCondition
+    ,${value} --value
+    ,1 --isActive
+    ,NULL --code
+);`;
+  } else {
+    const questLookup = alertQuestionnaireLookup(rule.code, programCode);
+    const alertLookup = `(SELECT [Id] FROM [dbo].[TemplateQuestionnaireAlert] WHERE [CodeSeverity] = ${severityCode} AND [TemplateQuestionnaireId] = ${questLookup})`;
+    return `-- ${rule.code} - ${rule.operator} - ${rule.value}
+INSERT INTO [dbo].[TemplateQuestionnaireAlert] ([Id] ,[TemplateQuestionnaireId] ,[CodeSeverity] ,[GroupId] ,[Snomed] ,[IsActive] ,[TemplateId])
+VALUES (
+    NEWID() --id
+    ,${questLookup} --templateQuestionnaireId
+    ,${severityCode} --codeSeverity
+    ,NULL --groupId
+    ,NULL --snomed
+    ,1 --isActive
+    ,${templateLookup} --templateId
+);
+INSERT INTO [dbo].[TemplateItemQuestionnaireAlert] ([Id] ,[TemplateQuestionnaireAlertId] ,[CodeSnomed] ,[CodeAlertCondition] ,[Value] ,[IsActive] ,[Code])
+VALUES (
+    NEWID() --id
+    ,${alertLookup} --templateQuestionnaireAlertId
+    ,NULL --codeSnomed
+    ,${sqlString(rule.operator)} --codeAlertCondition
+    ,${value} --value
+    ,1 --isActive
+    ,NULL --code
+);`;
+  }
+}
+
+export function generateAlertRulesSql(programCode: string, rules: AlertRule[]): string | null {
+  if (rules.length === 0) return null;
+
+  const lines: string[] = [
+    `-- =============================================`,
+    `-- Alert Rules (${programCode})`,
+    `-- =============================================`,
+  ];
+
+  for (const rule of rules) {
+    lines.push("", generateAlertRuleInsert(rule, programCode));
+  }
+
+  lines.push("");
+  return lines.join("\n");
+}
+
+export function generateAlertRulesDeleteSql(programCode: string): string {
+  const pc = sqlString(programCode);
+  const tId = `(SELECT [Id] FROM [dbo].[Template] WHERE [ProgramCode] = ${pc})`;
+  return `-- =============================================
+-- Rollback de 06-Regras-de-alerta.sql para ProgramCode = ${pc}
+-- =============================================
+
+-- Biometric alert items
+DELETE FROM [dbo].[TemplateItemBiometricParameterAlert] WHERE [TemplateBiometricParameterAlertId] IN (SELECT [Id] FROM [dbo].[TemplateBiometricParameterAlert] WHERE [TemplateId] = ${tId});
+DELETE FROM [dbo].[TemplateBiometricParameterAlert] WHERE [TemplateId] = ${tId};
+
+-- Questionnaire alert items
+DELETE FROM [dbo].[TemplateItemQuestionnaireAlert] WHERE [TemplateQuestionnaireAlertId] IN (SELECT [Id] FROM [dbo].[TemplateQuestionnaireAlert] WHERE [TemplateId] = ${tId});
+DELETE FROM [dbo].[TemplateQuestionnaireAlert] WHERE [TemplateId] = ${tId};`;
 }

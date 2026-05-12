@@ -136,3 +136,11 @@ export interface PredefinedQuestionnaire {
   instructions: string;
   questions: PredefinedQuestion[];
 }
+
+export interface AlertRule {
+  prescriptionType: "biometric" | "questionnaire";
+  code: string;         // e.g. HEARTRATE, PEROXYSAT, QUES0139
+  operator: string;     // e.g. BPOC_GREATER, BPOC_LESS, BPOC_EQUAL
+  value: string;        // e.g. "120", "92", "VAD_WORST"
+  severityCode: string; // e.g. BPOC_HIGH, BPOC_AVERAGE
+}

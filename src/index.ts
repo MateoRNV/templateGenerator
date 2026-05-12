@@ -15,6 +15,7 @@ import {
   parseTemplatesExerciciosCsv,
   parseNovosQuestionariosCsv,
   parseQuestionnaireSchedulesCsv,
+  parseAlertRulesCsv,
 } from "./csvParser.js";
 import {
   generateProgramSql, generateProgramDeleteSql,
@@ -24,6 +25,7 @@ import {
   generateTemplateDeleteSql, generateConteudosDeleteSql, generateExerciciosDeleteSql,
   generateExerciciosParametrosDeleteSql, generateBpDeleteSql, generatePreDeleteSql,
   generateContentDeleteSql, generateQuestDeleteSql,
+  generateAlertRulesSql, generateAlertRulesDeleteSql,
 } from "./sqlGenerators.js";
 
 const CSV_DIR = join(import.meta.dirname, "..", "csv");
@@ -45,6 +47,7 @@ interface CsvGroup {
   contentsFile: string | null;
   templatesExerciciosFile: string | null;
   novosQuestionariosScoringFile: string | null;
+  regrasAlertaFile: string | null;
   label: string;
 }
 
@@ -116,6 +119,11 @@ function discoverCsvGroups(dir: string): CsvGroup[] {
       || files.find((f) => f.includes("(Novos_questionarios_scoring)") && f.endsWith(".csv"))
       || null;
 
+    const regrasAlertaFile =
+      files.find((f) => f.startsWith(prefix) && f.includes("(Templates_regrasalerta)") && f.endsWith(".csv"))
+      || files.find((f) => f.includes("(Templates_regrasalerta)") && f.endsWith(".csv"))
+      || null;
+
     groups.push({
       programFile: join(dir, pf),
       parametersFile: join(dir, paramFile),
@@ -125,6 +133,7 @@ function discoverCsvGroups(dir: string): CsvGroup[] {
       contentsFile: contentsFile ? join(dir, contentsFile) : null,
       templatesExerciciosFile: templatesExerciciosFile ? join(dir, templatesExerciciosFile) : null,
       novosQuestionariosScoringFile: novosQuestionariosScoringFile ? join(dir, novosQuestionariosScoringFile) : null,
+      regrasAlertaFile: regrasAlertaFile ? join(dir, regrasAlertaFile) : null,
       label: labelFromPrefix(prefix),
     });
   }
@@ -488,6 +497,21 @@ function runFullGeneration(): void {
     } else {
       console.log(`  -> 04-Exercicios.sql ignorado (ficheiro Templates_exercicios não encontrado)`);
       console.log(`  -> 04.1-Exercicios-Parametros.sql ignorado (ficheiro Templates_exercicios não encontrado)`);
+    }
+
+    if (group.regrasAlertaFile) {
+      const alertRules = parseAlertRulesCsv(group.regrasAlertaFile, program.name);
+      const alertSql = generateAlertRulesSql(program.code, alertRules);
+      if (alertSql) {
+        const alertPath = join(OUTPUT_DIR, `${group.label}_06-Regras-de-alerta.sql`);
+        const alertDelete = generateAlertRulesDeleteSql(program.code);
+        writeSqlPair(alertPath, alertSql, join(DELETE_DIR, `${group.label}_06-Regras-de-alerta.sql`), alertDelete);
+        console.log(`  -> 06-Regras-de-alerta.sql (${alertRules.length} regra(s))`);
+      } else {
+        console.log(`  -> 06-Regras-de-alerta.sql ignorado (sem regras para ${program.name})`);
+      }
+    } else {
+      console.log(`  -> 06-Regras-de-alerta.sql ignorado (ficheiro Templates_regrasalerta não encontrado)`);
     }
   }
 

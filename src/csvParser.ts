@@ -1,5 +1,5 @@
 import { readFileSync } from "fs";
-import type { ProgramData, TemplateParameter, NewParameter, NewExercise, NewContent, BiometricSchedule, WeekDaySchedule, ContentPlan, ExercisePlan, EducationalContentItem, TemplateExerciseItem, AnswerKey, PredefinedQuestion, PredefinedQuestionnaire, QuestionnaireSchedule } from "./types.js";
+import type { ProgramData, TemplateParameter, NewParameter, NewExercise, NewContent, BiometricSchedule, WeekDaySchedule, ContentPlan, ExercisePlan, EducationalContentItem, TemplateExerciseItem, AnswerKey, PredefinedQuestion, PredefinedQuestionnaire, QuestionnaireSchedule, AlertRule } from "./types.js";
 
 function parseNum(val: string): number | null {
   if (!val) return null;
@@ -660,4 +660,36 @@ export function parseContentsCsv(filePath: string): EducationalContentItem[] {
   }
 
   return items;
+}
+
+export function parseAlertRulesCsv(filePath: string, programName: string): AlertRule[] {
+  // Headers: Programa(0),Tipo de regra(1),Prescrição da regra(2),Regra de alerta(3),
+  //          codes(4),Gravidade(5),Gravidade Code(6),Origem(7),Composta(8)
+  // Only rows whose col 4 (codes) is non-empty and col 0 matches programName.
+  // codes format: "CODE - OPERATOR - VALUE"
+  const rows = readCsvFile(filePath);
+  const normTarget = normalizeAccents(programName);
+  const rules: AlertRule[] = [];
+
+  for (const row of rows) {
+    if (!row[0] || !row[4]) continue;
+    if (normalizeAccents(row[0]) !== normTarget) continue;
+
+    const parts = row[4].split("-").map(p => p.trim());
+    if (parts.length < 3) continue;
+    const code = parts[0];
+    const operator = parts[1];
+    const value = parts.slice(2).join("-").trim(); // value may contain hyphens
+
+    const severityCode = (row[6] || "").trim();
+    if (!code || !operator || !value || !severityCode) continue;
+
+    const prescType = normalizeAccents(row[2] || "");
+    const prescriptionType: "biometric" | "questionnaire" =
+      prescType.includes("quest") ? "questionnaire" : "biometric";
+
+    rules.push({ prescriptionType, code, operator, value, severityCode });
+  }
+
+  return rules;
 }
