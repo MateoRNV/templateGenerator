@@ -539,6 +539,25 @@ export function generateTemplateSql(
   return lines.join("\n");
 }
 
+function generateBpCatalogParameterInsert(code: string): string {
+  const codeStr = sqlString(code);
+  const cdt = `(SELECT TOP (1) [Id] FROM [dbo].[ClinicalDataType] WHERE [Code] = ${codeStr})`;
+  return `IF NOT EXISTS (SELECT 1 FROM [dbo].[BiometricParameter] WHERE [ClinicalDataTypeId] = ${cdt})
+BEGIN
+    INSERT INTO [dbo].[BiometricParameter] ([Id] ,[ClinicalDataTypeId] ,[IsActive])
+    VALUES (${cdt} ,${cdt} ,1)
+END`;
+}
+
+function generateBpCatalogAlertInsert(code: string): string {
+  const codeStr = sqlString(code);
+  const cdt = `(SELECT TOP (1) [Id] FROM [dbo].[ClinicalDataType] WHERE [Code] = ${codeStr})`;
+  return `INSERT INTO [dbo].[BiometricParameterAlertClinicalDataType]
+    SELECT NEWID() ,[BP].[Id] ,[BP].[ClinicalDataTypeId] ,1
+    FROM [dbo].[BiometricParameter] [BP]
+    WHERE [BP].[ClinicalDataTypeId] = ${cdt};`;
+}
+
 export function generateBpSql(
   newParameters: NewParameter[]
 ): string | null {
@@ -551,7 +570,10 @@ export function generateBpSql(
   ];
 
   newParameters.forEach((param, index) => {
-    lines.push("", generateClinicalDataTypeInsert(param, index + 1));
+    lines.push(``, `-- Parameter: ${param.name} (${param.code})`);
+    lines.push(generateClinicalDataTypeInsert(param, index + 1));
+    lines.push(generateBpCatalogParameterInsert(param.code));
+    lines.push(generateBpCatalogAlertInsert(param.code));
   });
 
   lines.push("");
