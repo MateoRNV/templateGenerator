@@ -44,6 +44,7 @@ interface CsvGroup {
   recorrenciaFile: string | null;
   contentsFile: string | null;
   templatesExerciciosFile: string | null;
+  novosQuestionariosScoringFile: string | null;
   label: string;
 }
 
@@ -110,6 +111,11 @@ function discoverCsvGroups(dir: string): CsvGroup[] {
       || files.find((f) => f.includes("(Templates_exercicios)") && f.endsWith(".csv"))
       || null;
 
+    const novosQuestionariosScoringFile =
+      files.find((f) => f.startsWith(prefix) && f.includes("(Novos_questionarios_scoring)") && f.endsWith(".csv"))
+      || files.find((f) => f.includes("(Novos_questionarios_scoring)") && f.endsWith(".csv"))
+      || null;
+
     groups.push({
       programFile: join(dir, pf),
       parametersFile: join(dir, paramFile),
@@ -118,6 +124,7 @@ function discoverCsvGroups(dir: string): CsvGroup[] {
       recorrenciaFile: recorrenciaFile ? join(dir, recorrenciaFile) : null,
       contentsFile: contentsFile ? join(dir, contentsFile) : null,
       templatesExerciciosFile: templatesExerciciosFile ? join(dir, templatesExerciciosFile) : null,
+      novosQuestionariosScoringFile: novosQuestionariosScoringFile ? join(dir, novosQuestionariosScoringFile) : null,
       label: labelFromPrefix(prefix),
     });
   }
@@ -158,6 +165,15 @@ function discoverNovosQuestionarios(dir: string): QuestionariosOnly[] {
     .map((f) => ({
       novosQuestionariosFile: join(dir, f),
       label: labelFromPrefix(f.split("(Novos_questionarios_predefinido)")[0]),
+    }));
+}
+
+function discoverNovosQuestionariosScoring(dir: string): QuestionariosOnly[] {
+  return readdirSync(dir)
+    .filter((f) => f.includes("(Novos_questionarios_scoring)") && f.endsWith(".csv"))
+    .map((f) => ({
+      novosQuestionariosFile: join(dir, f),
+      label: labelFromPrefix(f.split("(Novos_questionarios_scoring)")[0]),
     }));
 }
 
@@ -204,14 +220,28 @@ function writeQuestSql(novosQuestionariosFile: string, label: string): void {
   const questionnaires = parseNovosQuestionariosCsv(novosQuestionariosFile);
   const questSql = generateQuestSql(questionnaires);
   if (!questSql) {
-    console.log(`  -> 01-Quest.sql skipped (no new questionnaires)`);
+    console.log(`  -> 01-Quest_predefined.sql skipped (no new questionnaires)`);
     return;
   }
-  const questPath = join(OUTPUT_DIR, `${label}_01-Quest.sql`);
+  const questPath = join(OUTPUT_DIR, `${label}_01-Quest_predefined.sql`);
   const questDelete = generateQuestDeleteSql(questionnaires);
-  writeSqlPair(questPath, questSql, join(DELETE_DIR, `${label}_01-Quest.sql`), questDelete!);
+  writeSqlPair(questPath, questSql, join(DELETE_DIR, `${label}_01-Quest_predefined.sql`), questDelete!);
   const totalQuestions = questionnaires.reduce((acc, q) => acc + q.questions.length, 0);
-  console.log(`  -> 01-Quest.sql (${questionnaires.length} questionnaire(s), ${totalQuestions} question(s))`);
+  console.log(`  -> 01-Quest_predefined.sql (${questionnaires.length} questionnaire(s), ${totalQuestions} question(s))`);
+}
+
+function writeQuestScoringSql(novosQuestionariosFile: string, label: string): void {
+  const questionnaires = parseNovosQuestionariosCsv(novosQuestionariosFile);
+  const questSql = generateQuestSql(questionnaires);
+  if (!questSql) {
+    console.log(`  -> 01-Quest_scoring.sql skipped (no new questionnaires)`);
+    return;
+  }
+  const questPath = join(OUTPUT_DIR, `${label}_01-Quest_scoring.sql`);
+  const questDelete = generateQuestDeleteSql(questionnaires);
+  writeSqlPair(questPath, questSql, join(DELETE_DIR, `${label}_01-Quest_scoring.sql`), questDelete!);
+  const totalQuestions = questionnaires.reduce((acc, q) => acc + q.questions.length, 0);
+  console.log(`  -> 01-Quest_scoring.sql (${questionnaires.length} questionnaire(s), ${totalQuestions} question(s))`);
 }
 
 function runOnlyNovosParametros(): void {
@@ -286,6 +316,24 @@ function runOnlyNovosQuestionarios(): void {
   console.log("\nDone! Output written to:", OUTPUT_DIR);
 }
 
+function runOnlyNovosQuestionariosScoring(): void {
+  const items = discoverNovosQuestionariosScoring(CSV_DIR);
+  if (items.length === 0) {
+    console.error("No Novos_questionarios_scoring CSV found in:", CSV_DIR);
+    process.exit(1);
+  }
+
+  mkdirSync(OUTPUT_DIR, { recursive: true });
+
+  for (const item of items) {
+    console.log(`\nProcessing: ${item.label}`);
+    console.log(`  Questionarios scoring CSV: ${basename(item.novosQuestionariosFile)}`);
+    writeQuestScoringSql(item.novosQuestionariosFile, item.label);
+  }
+
+  console.log("\nDone! Output written to:", OUTPUT_DIR);
+}
+
 function runFullGeneration(): void {
   const groups = discoverCsvGroups(CSV_DIR);
   if (groups.length === 0) {
@@ -302,6 +350,7 @@ function runFullGeneration(): void {
 
   // Questionarios catalog is also program-agnostic; emit once after parametros (per user spec).
   const questionarios = discoverNovosQuestionarios(CSV_DIR);
+  const questionariosScoring = discoverNovosQuestionariosScoring(CSV_DIR);
   let questionariosEmitted = false;
 
   for (const group of groups) {
@@ -358,11 +407,18 @@ function runFullGeneration(): void {
 
     if (!questionariosEmitted) {
       for (const item of questionarios) {
-        console.log(`  Questionarios catalog: ${basename(item.novosQuestionariosFile)}`);
+        console.log(`  Questionarios predefined: ${basename(item.novosQuestionariosFile)}`);
         writeQuestSql(item.novosQuestionariosFile, item.label);
       }
       if (questionarios.length === 0) {
-        console.log(`  -> 01-Quest.sql ignorado (ficheiro Novos_questionarios_predefinido não encontrado)`);
+        console.log(`  -> 01-Quest_predefined.sql ignorado (ficheiro Novos_questionarios_predefinido não encontrado)`);
+      }
+      for (const item of questionariosScoring) {
+        console.log(`  Questionarios scoring: ${basename(item.novosQuestionariosFile)}`);
+        writeQuestScoringSql(item.novosQuestionariosFile, item.label);
+      }
+      if (questionariosScoring.length === 0) {
+        console.log(`  -> 01-Quest_scoring.sql ignorado (ficheiro Novos_questionarios_scoring não encontrado)`);
       }
       questionariosEmitted = true;
     }
@@ -441,10 +497,11 @@ function runFullGeneration(): void {
 async function main(): Promise<void> {
   console.log("=== Template Generator ===\n");
   console.log("  1) Crear nuevos parámetros biométricos (solo 01-BP.sql)");
-  console.log("  2) Crear nuevos cuestionarios predefinidos (solo 01-Quest.sql)");
-  console.log("  3) Crear nuevos exercicios (solo 01-PRE.sql)");
-  console.log("  4) Crear nuevos conteudos (solo 01-Content.sql)");
-  console.log("  5) Generar template completo (01-BP + 01-Quest + 01-PRE + 01-Content + 02-Template + 03-Conteudos + 04-Exercicios)");
+  console.log("  2) Crear nuevos cuestionarios predefinidos (solo 01-Quest_predefined.sql)");
+  console.log("  3) Crear nuevos cuestionarios scoring (solo 01-Quest_scoring.sql)");
+  console.log("  4) Crear nuevos exercicios (solo 01-PRE.sql)");
+  console.log("  5) Crear nuevos conteudos (solo 01-Content.sql)");
+  console.log("  6) Generar template completo (01-BP + 01-Quest_* + 01-PRE + 01-Content + 02-Template + 03-Conteudos + 04-Exercicios)");
   console.log("  q) Salir\n");
 
   const rl = createInterface({ input, output });
@@ -459,12 +516,15 @@ async function main(): Promise<void> {
       runOnlyNovosQuestionarios();
       break;
     case "3":
-      runOnlyNovosExercicios();
+      runOnlyNovosQuestionariosScoring();
       break;
     case "4":
-      runOnlyNovosConteudos();
+      runOnlyNovosExercicios();
       break;
     case "5":
+      runOnlyNovosConteudos();
+      break;
+    case "6":
       runFullGeneration();
       break;
     case "q":
