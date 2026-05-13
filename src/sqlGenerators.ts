@@ -1159,7 +1159,7 @@ VALUES (
     ,${sqlString(rule.operator)} --codeAlertCondition
     ,${value} --value
     ,1 --isActive
-    ,NULL --code
+    ,${sqlString(rule.code)} --code
 );`;
   } else {
     return `INSERT INTO [dbo].[TemplateItemQuestionnaireAlert] ([Id] ,[TemplateQuestionnaireId] ,[CodeQuestion] ,[CodeAlertCondition] ,[CodeAnswer] ,[IsActive])
