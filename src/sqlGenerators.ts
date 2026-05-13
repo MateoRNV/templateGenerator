@@ -1162,10 +1162,10 @@ VALUES (
     ,${sqlString(rule.code)} --code
 );`;
   } else {
-    return `INSERT INTO [dbo].[TemplateItemQuestionnaireAlert] ([Id] ,[TemplateQuestionnaireId] ,[CodeQuestion] ,[CodeAlertCondition] ,[CodeAnswer] ,[IsActive])
+    return `INSERT INTO [dbo].[TemplateItemQuestionnaireAlert] ([Id] ,[TemplateQuestionnaireAlertId] ,[CodeQuestion] ,[CodeAlertCondition] ,[CodeAnswer] ,[IsActive])
 VALUES (
     NEWID() --id
-    ,${alertLookup} --templateQuestionnaireId
+    ,${alertLookup} --templateQuestionnaireAlertId
     ,${sqlString(rule.code)} --codeQuestion
     ,${sqlString(rule.operator)} --codeAlertCondition
     ,${value} --codeAnswer
@@ -1196,14 +1196,13 @@ VALUES (
     ,${templateLookup} --templateId
 );`);
   } else {
-    const questLookup = alertQuestionnaireLookup(first.code, programCode);
-    alertLookup = `(SELECT [Id] FROM [dbo].[TemplateQuestionnaireAlert] WHERE [CodeSeverity] = ${severityCode} AND [TemplateQuestionnaireId] = ${questLookup})`;
-    lines.push(`INSERT INTO [dbo].[TemplateQuestionnaireAlert] ([Id] ,[TemplateQuestionnaireId] ,[CodeSeverity] ,[GroupId] ,[IsActive] ,[TemplateId])
+    const groupIdVal = sqlString(groupId);
+    alertLookup = `(SELECT [Id] FROM [dbo].[TemplateQuestionnaireAlert] WHERE [GroupId] = ${groupIdVal} AND [TemplateId] = ${templateLookup})`;
+    lines.push(`INSERT INTO [dbo].[TemplateQuestionnaireAlert] ([Id] ,[CodeSeverity] ,[GroupId] ,[IsActive] ,[TemplateId])
 VALUES (
     NEWID() --id
-    ,${questLookup} --templateQuestionnaireId
     ,${severityCode} --codeSeverity
-    ,NULL --groupId
+    ,${groupIdVal} --groupId
     ,1 --isActive
     ,${templateLookup} --templateId
 );`);
