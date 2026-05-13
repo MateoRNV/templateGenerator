@@ -1101,12 +1101,17 @@ export function generateQuestDeleteSql(questionnaires: PredefinedQuestionnaire[]
     }
   }
 
+  const pqFilter = `[ProfessionalQuestionnaireId] IN (SELECT [Id] FROM [dbo].[ProfessionalQuestionnaire] WHERE [Code] IN (${questionnaireCodes}))`;
+
   const lines: string[] = [
     `-- =============================================`,
     `-- Rollback de 01-Quest.sql (ProfessionalQuestionnaire catalog)`,
     `-- =============================================`,
     ``,
-    `DELETE FROM [dbo].[ProfessionalQuestionnaireQuestion] WHERE [ProfessionalQuestionnaireId] IN (SELECT [Id] FROM [dbo].[ProfessionalQuestionnaire] WHERE [Code] IN (${questionnaireCodes}));`,
+    `-- Patient data referencing these questionnaires (delete first to satisfy FK)`,
+    `DELETE FROM [dbo].[PatientQuestionnaire] WHERE ${pqFilter};`,
+    ``,
+    `DELETE FROM [dbo].[ProfessionalQuestionnaireQuestion] WHERE ${pqFilter};`,
     `DELETE FROM [dbo].[ProfessionalQuestionnaire] WHERE [Code] IN (${questionnaireCodes});`,
   ];
 
