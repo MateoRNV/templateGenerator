@@ -1196,15 +1196,14 @@ VALUES (
     ,${templateLookup} --templateId
 );`);
   } else {
-    const groupIdVal = sqlString(groupId);
     const questionnaireLookup = `(SELECT [Id] FROM [dbo].[TemplateQuestionnaire] WHERE [Code] = ${sqlString(first.questionnaireCode)} AND [TemplateId] = ${templateLookup})`;
-    alertLookup = `(SELECT [Id] FROM [dbo].[TemplateQuestionnaireAlert] WHERE [GroupId] = ${groupIdVal} AND [TemplateId] = ${templateLookup})`;
+    alertLookup = `(SELECT [Id] FROM [dbo].[TemplateQuestionnaireAlert] WHERE [TemplateQuestionnaireId] = ${questionnaireLookup} AND [CodeSeverity] = ${severityCode})`;
     lines.push(`INSERT INTO [dbo].[TemplateQuestionnaireAlert] ([Id] ,[TemplateQuestionnaireId] ,[CodeSeverity] ,[GroupId] ,[IsActive] ,[TemplateId])
 VALUES (
     NEWID() --id
     ,${questionnaireLookup} --templateQuestionnaireId
     ,${severityCode} --codeSeverity
-    ,${groupIdVal} --groupId
+    ,NULL --groupId
     ,1 --isActive
     ,${templateLookup} --templateId
 );`);
