@@ -1110,6 +1110,7 @@ export function generateQuestDeleteSql(questionnaires: PredefinedQuestionnaire[]
     ``,
     `-- Patient data referencing these questionnaires (delete first to satisfy FK)`,
     `DELETE FROM [dbo].[PatientQuestionnaireQuestion] WHERE [PatientQuestionnaireId] IN (SELECT [Id] FROM [dbo].[PatientQuestionnaire] WHERE ${pqFilter});`,
+    `DELETE FROM [dbo].[PatientQuestionnaireMonitorConfigurationDetail] WHERE [PatientQuestionnaireId] IN (SELECT [Id] FROM [dbo].[PatientQuestionnaire] WHERE ${pqFilter});`,
     `DELETE FROM [dbo].[PatientQuestionnaire] WHERE ${pqFilter};`,
     ``,
     `DELETE FROM [dbo].[ProfessionalQuestionnaireQuestion] WHERE ${pqFilter};`,
