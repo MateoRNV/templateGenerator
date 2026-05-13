@@ -1101,21 +1101,25 @@ export function generateQuestDeleteSql(questionnaires: PredefinedQuestionnaire[]
     }
   }
 
-  const pqFilter = `[ProfessionalQuestionnaireId] IN (SELECT [Id] FROM [dbo].[ProfessionalQuestionnaire] WHERE [Code] IN (${questionnaireCodes}))`;
+  const profQuestIds = `(SELECT [Id] FROM [dbo].[ProfessionalQuestionnaire] WHERE [Code] IN (${questionnaireCodes}))`;
+  const patQuestIds = `(SELECT [Id] FROM [dbo].[PatientQuestionnaire] WHERE [ProfessionalQuestionnaireId] IN ${profQuestIds})`;
+  const configDetailIds = `(SELECT [Id] FROM [dbo].[PatientQuestionnaireMonitorConfigurationDetail] WHERE [PatientQuestionnaireId] IN ${patQuestIds})`;
 
   const lines: string[] = [
     `-- =============================================`,
     `-- Rollback de 01-Quest.sql (ProfessionalQuestionnaire catalog)`,
     `-- =============================================`,
     ``,
-    `-- Patient data referencing these questionnaires (delete first to satisfy FK)`,
-    `DELETE FROM [dbo].[PatientQuestionnaireQuestion] WHERE [PatientQuestionnaireId] IN (SELECT [Id] FROM [dbo].[PatientQuestionnaire] WHERE ${pqFilter});`,
-    `DELETE FROM [dbo].[PatientQuestionnaireMonitorConfigurationWeekDay] WHERE [PatientQuestionnaireMonitorConfigurationDetailId] IN (SELECT [Id] FROM [dbo].[PatientQuestionnaireMonitorConfigurationDetail] WHERE [PatientQuestionnaireId] IN (SELECT [Id] FROM [dbo].[PatientQuestionnaire] WHERE ${pqFilter}));`,
-    `DELETE FROM [dbo].[PatientQuestionnaireMonitorConfigurationPeriod] WHERE [PatientQuestionnaireMonitorConfigurationDetailId] IN (SELECT [Id] FROM [dbo].[PatientQuestionnaireMonitorConfigurationDetail] WHERE [PatientQuestionnaireId] IN (SELECT [Id] FROM [dbo].[PatientQuestionnaire] WHERE ${pqFilter}));`,
-    `DELETE FROM [dbo].[PatientQuestionnaireMonitorConfigurationDetail] WHERE [PatientQuestionnaireId] IN (SELECT [Id] FROM [dbo].[PatientQuestionnaire] WHERE ${pqFilter});`,
-    `DELETE FROM [dbo].[PatientQuestionnaire] WHERE ${pqFilter};`,
+    `-- Patient data (delete leaf→root to satisfy all FKs)`,
+    `DELETE FROM [dbo].[PatientQuestionnaireQuestion] WHERE [PatientQuestionnaireId] IN ${patQuestIds};`,
+    `DELETE FROM [dbo].[PatientQuestionnaireMonitorConfigurationProgram] WHERE [PatientQuestionnaireMonitorConfigurationDetailId] IN ${configDetailIds};`,
+    `DELETE FROM [dbo].[PatientQuestionnaireMonitorConfigurationPeriod] WHERE [PatientQuestionnaireMonitorConfigurationDetailId] IN ${configDetailIds};`,
+    `DELETE FROM [dbo].[PatientQuestionnaireMonitorSchedule] WHERE [PatientQuestionnaireMonitorConfigurationId] IN ${configDetailIds};`,
+    `DELETE FROM [dbo].[PatientQuestionnaireMonitorConfigurationWeekDay] WHERE [PatientQuestionnaireMonitorConfigurationDetailId] IN ${configDetailIds};`,
+    `DELETE FROM [dbo].[PatientQuestionnaireMonitorConfigurationDetail] WHERE [PatientQuestionnaireId] IN ${patQuestIds};`,
+    `DELETE FROM [dbo].[PatientQuestionnaire] WHERE [ProfessionalQuestionnaireId] IN ${profQuestIds};`,
     ``,
-    `DELETE FROM [dbo].[ProfessionalQuestionnaireQuestion] WHERE ${pqFilter};`,
+    `DELETE FROM [dbo].[ProfessionalQuestionnaireQuestion] WHERE [ProfessionalQuestionnaireId] IN ${profQuestIds};`,
     `DELETE FROM [dbo].[ProfessionalQuestionnaire] WHERE [Code] IN (${questionnaireCodes});`,
   ];
 
