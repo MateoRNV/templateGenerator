@@ -139,9 +139,10 @@ export interface PredefinedQuestionnaire {
 
 export interface AlertRule {
   prescriptionType: "biometric" | "questionnaire";
-  groupId: string;      // col 8 — rows with same groupId share one Alert record
-  code: string;         // e.g. HEARTRATE, PEROXYSAT, QUES0139
-  operator: string;     // e.g. BPOC_GREATER, BPOC_LESS, BPOC_EQUAL
-  value: string;        // e.g. "120", "92", "VAD_WORST"
-  severityCode: string; // e.g. BPOC_HIGH, BPOC_AVERAGE
+  groupId: string;           // col 8 — rows with same groupId share one Alert record
+  code: string;              // e.g. HEARTRATE, PEROXYSAT, QUES0139
+  operator: string;          // e.g. BPOC_GREATER, BPOC_LESS, BPOC_EQUAL
+  value: string;             // e.g. "120", "92", "VAD_WORST"
+  severityCode: string;      // e.g. BPOC_HIGH, BPOC_AVERAGE
+  questionnaireCode: string; // col 9 — questionnaire code for TemplateQuestionnaireId lookup
 }

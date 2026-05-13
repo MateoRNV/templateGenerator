@@ -689,8 +689,9 @@ export function parseAlertRulesCsv(filePath: string, programName: string): Alert
       prescType.includes("quest") ? "questionnaire" : "biometric";
 
     const groupId = (row[8] || "").trim() || `_auto_${rules.length}`;
+    const questionnaireCode = (row[9] || "").trim();
 
-    rules.push({ prescriptionType, groupId, code, operator, value, severityCode });
+    rules.push({ prescriptionType, groupId, code, operator, value, severityCode, questionnaireCode });
   }
 
   return rules;
