@@ -28,3 +28,36 @@ VALUES (
 );
 
 GO
+
+USE [DbTeleHealthIntegratedCare]
+GO
+DECLARE @Code nvarchar(32) = 'WATERREINFORCE';
+
+IF NOT EXISTS (SELECT * FROM [dbo].[BiometricParameter] [BP]
+				WHERE [BP].[ClinicalDataTypeId] = (SELECT TOP (1) [Id] FROM [dbo].[ClinicalDataType] WHERE [Code] = @Code))
+BEGIN
+	INSERT INTO [dbo].[BiometricParameter]
+		([Id]
+		 ,[ClinicalDataTypeId]
+		 ,[IsActive])
+	VALUES (
+		(SELECT TOP (1) [Id] FROM [dbo].[ClinicalDataType] WHERE [Code] = @Code)
+		,(SELECT TOP (1) [Id] FROM [dbo].[ClinicalDataType] WHERE [Code] = @Code)
+		,1)
+END
+
+
+USE [DbTeleHealthIntegratedCare]
+GO
+DECLARE @Code NVARCHAR(32) = 'WATERREINFORCE';
+
+INSERT INTO [dbo].[BiometricParameterAlertClinicalDataType]
+	SELECT NEWID()
+		,[BP].[Id]
+		,[BP].[ClinicalDataTypeId]
+		,1
+	FROM [dbo].[BiometricParameter] [BP] WHERE [BP].[ClinicalDataTypeId] = (SELECT TOP (1) [Id]
+			FROM [dbo].[ClinicalDataType] WHERE [Code] = @Code)
+GO
+
+

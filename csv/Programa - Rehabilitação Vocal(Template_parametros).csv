@@ -1,0 +1,9 @@
+,,,,,,,,
+Programa,Tipo de prescrição,Prescrição,Code,Modo de medição,Dispositivo,Dispositivo code,Monitorização recorrente,Duração
+Reabilitação Vocal,Parâmetro biométrico,Saturação de oxigénio,HEARTRATE,Automática,Mola IHealth,IHEALTHOXIMETER,Sim,182
+Reabilitação Vocal,Parâmetro biométrico,Frequência cardíaca,PEROXYSAT,Automática,Mola IHealth,IHEALTHOXIMETER,Sim,182
+Reabilitação Vocal,Parâmetro biométrico,Reforço hidríco (Hidratação em mobile),WATERREINFORCE,Manual,,,Sim,182
+,,,,,,,,
+,,,,,,,,
+,,,,,,,,
+,,,,,,,,
