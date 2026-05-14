@@ -1,0 +1,12 @@
+,,,,,,,,
+Programa,Tipo de prescrição,Prescrição,Code,Modo de medição,Dispositivo,Dispositivo code,Monitorização recorrente,Duração
+Doente Renal Crónico,Parâmetro biométrico,Pressão arterial,BLOPRE,Automática,Tensiómetro IHealth,IHEALTHTENSIOMETER,Sim,182
+Doente Renal Crónico,Parâmetro biométrico,Frequência cardíaca,HEARTRATE,Automática,Tensiómetro IHealth,IHEALTHTENSIOMETER,Sim,182
+Doente Renal Crónico,Parâmetro biométrico,Saturação de oxigénio,PEROXYSAT,Automática,Mola IHealth,IHEALTHOXIMETER,Sim,182
+Doente Renal Crónico,Parâmetro biométrico,Frequência cardíaca,HEARTRATE,Automática,Mola IHealth,IHEALTHOXIMETER,Sim,182
+Doente Renal Crónico,Parâmetro biométrico,Peso Corporal,BODWEI,Manual,,,Sim,182
+Doente Renal Crónico,Parâmetro biométrico,Pressão arterial,BLOPRE,Manual,,,Sim,182
+Doente Renal Crónico,Parâmetro biométrico,Frequência cardíaca,HEARTRATE,Manual,,,Sim,182
+Doente Renal Crónico,Parâmetro biométrico,Saturação de oxigénio,PEROXYSAT,Manual,,,Sim,182
+Doente Renal Crónico,Parâmetro biométrico,Dor,PAIN,Manual,,,Sim,182
+Doente Renal Crónico,Parâmetro biométrico,Volume de urina,UROUT,Manual,,,Sim,182

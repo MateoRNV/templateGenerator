@@ -107,20 +107,22 @@ VALUES
 
 // -- TemplateBiometricParameterPeriod INSERT ----------------------------------
 
-function tbpLookup(parameterCode: string, programCode: string): string {
-  return `(SELECT [Id] FROM [dbo].[TemplateBiometricParameter] WHERE [Code] = ${sqlString(parameterCode)} AND [TemplateId] = (SELECT [Id] FROM [dbo].[Template] WHERE [ProgramCode] = ${sqlString(programCode)}))`;
+function tbpLookup(parameterCode: string, programCode: string, assessmentToolCode?: string | null): string {
+  const assessmentCond = assessmentToolCode ? ` AND [TBP].[AssessmentToolCode] = ${sqlString(assessmentToolCode)}` : " AND [TBP].[AssessmentToolCode] IS NULL";
+  return `(SELECT [TBP].[Id] FROM [dbo].[TemplateBiometricParameter] [TBP] WHERE [TBP].[Code] = ${sqlString(parameterCode)} AND [TBP].[TemplateId] = (SELECT [Id] FROM [dbo].[Template] WHERE [ProgramCode] = ${sqlString(programCode)})${assessmentCond})`;
 }
 
 function generateBiometricPeriodInsert(
   parameterCode: string,
   periodCode: string,
-  programCode: string
+  programCode: string,
+  assessmentToolCode?: string | null
 ): string {
   return `INSERT INTO [dbo].[TemplateBiometricParameterPeriod] ([Id] ,[Code] ,[TemplateBiometricParameterId] ,[IsActive])
 VALUES (
     NEWID() --id
     ,${sqlString(periodCode)} --code
-    ,${tbpLookup(parameterCode, programCode)} --templateBiometricParameterId
+    ,${tbpLookup(parameterCode, programCode, assessmentToolCode)} --templateBiometricParameterId
     ,1 --isActive
     );`;
 }
@@ -130,12 +132,13 @@ VALUES (
 function generateBiometricWeekDayInsert(
   parameterCode: string,
   dayNumber: number,
-  programCode: string
+  programCode: string,
+  assessmentToolCode?: string | null
 ): string {
   return `INSERT INTO [dbo].[TemplateBiometricParameterWeekDay] ([Id] ,[TemplateBiometricParameterId] ,[DayNumber] ,[IsActive])
 VALUES (
     NEWID() --id
-    ,${tbpLookup(parameterCode, programCode)} --templateBiometricParameterId
+    ,${tbpLookup(parameterCode, programCode, assessmentToolCode)} --templateBiometricParameterId
     ,${dayNumber} --dayNumber
     ,1 --isActive
     );`;
@@ -151,9 +154,10 @@ function generateBiometricWeekDayTimerInsert(
   parameterCode: string,
   dayNumber: number,
   time: string,
-  programCode: string
+  programCode: string,
+  assessmentToolCode?: string | null
 ): string {
-  const tbpwLookup = `(SELECT [Id] FROM [TemplateBiometricParameterWeekDay] [TBPW] WHERE [TBPW].[DayNumber] = ${dayNumber} AND [TBPW].TemplateBiometricParameterId = ${tbpLookup(parameterCode, programCode)})`;
+  const tbpwLookup = `(SELECT [Id] FROM [TemplateBiometricParameterWeekDay] [TBPW] WHERE [TBPW].[DayNumber] = ${dayNumber} AND [TBPW].TemplateBiometricParameterId = ${tbpLookup(parameterCode, programCode, assessmentToolCode)})`;
   return `INSERT INTO [dbo].[TemplateBiometricParameterWeekDayTimer] ([Id] ,[TemplateBiometricParameterWeekDayId] ,[WeekDayStartTime] ,[IsActive])
 VALUES (
     NEWID() --id
@@ -420,7 +424,7 @@ export function generateTemplateSql(
       lines.push("--Periods");
       const periods = splitPeriodCodes(schedule.periodCode);
       for (const period of periods) {
-        lines.push(generateBiometricPeriodInsert(param.code, period, program.code));
+        lines.push(generateBiometricPeriodInsert(param.code, period, program.code, param.deviceCode));
       }
     }
 
@@ -429,9 +433,9 @@ export function generateTemplateSql(
       lines.push("--Week days and hours");
       for (const day of schedule.weekDays) {
         lines.push(`--Day ${day.dayNumber} - ${day.times.join(" , ")}`);
-        lines.push(generateBiometricWeekDayInsert(param.code, day.dayNumber, program.code));
+        lines.push(generateBiometricWeekDayInsert(param.code, day.dayNumber, program.code, param.deviceCode));
         for (const time of day.times) {
-          lines.push(generateBiometricWeekDayTimerInsert(param.code, day.dayNumber, time, program.code));
+          lines.push(generateBiometricWeekDayTimerInsert(param.code, day.dayNumber, time, program.code, param.deviceCode));
         }
         lines.push("");
       }
