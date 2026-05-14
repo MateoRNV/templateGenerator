@@ -1152,30 +1152,31 @@ function alertQuestionnaireLookup(code: string, programCode: string): string {
   return `(SELECT [Id] FROM [dbo].[TemplateQuestionnaire] WHERE [Code] = ${sqlString(code)} AND [ProgramCode] = ${sqlString(programCode)})`;
 }
 
-function generateAlertItem(rule: AlertRule, alertLookup: string): string {
+function generateAlertItemBiometric(rule: AlertRule, tableName: string): string {
   const value = isNaN(Number(rule.value)) ? sqlString(rule.value) : rule.value;
-  if (rule.prescriptionType === "biometric") {
-    return `INSERT INTO [dbo].[TemplateItemBiometricParameterAlert] ([Id] ,[TemplateBiometricParameterAlertId] ,[CodeSnomed] ,[CodeAlertCondition] ,[Value] ,[IsActive] ,[Code])
-VALUES (
+  return `INSERT INTO [dbo].[TemplateItemBiometricParameterAlert] ([Id] ,[TemplateBiometricParameterAlertId] ,[CodeSnomed] ,[CodeAlertCondition] ,[Value] ,[IsActive] ,[Code])
+SELECT 
     NEWID() --id
-    ,${alertLookup} --templateBiometricParameterAlertId
+    ,Id --templateBiometricParameterAlertId
     ,NULL --codeSnomed
     ,${sqlString(rule.operator)} --codeAlertCondition
     ,${value} --value
     ,1 --isActive
     ,${sqlString(rule.code)} --code
-);`;
-  } else {
-    return `INSERT INTO [dbo].[TemplateItemQuestionnaireAlert] ([Id] ,[TemplateQuestionnaireAlertId] ,[CodeQuestion] ,[CodeAlertCondition] ,[CodeAnswer] ,[IsActive])
+FROM ${tableName};`;
+}
+
+function generateAlertItemQuestionnaire(rule: AlertRule, varName: string): string {
+  const value = isNaN(Number(rule.value)) ? sqlString(rule.value) : rule.value;
+  return `INSERT INTO [dbo].[TemplateItemQuestionnaireAlert] ([Id] ,[TemplateQuestionnaireAlertId] ,[CodeQuestion] ,[CodeAlertCondition] ,[CodeAnswer] ,[IsActive])
 VALUES (
     NEWID() --id
-    ,${alertLookup} --templateQuestionnaireAlertId
+    ,${varName} --templateQuestionnaireAlertId
     ,${sqlString(rule.code)} --codeQuestion
     ,${sqlString(rule.operator)} --codeAlertCondition
     ,${value} --codeAnswer
     ,1 --isActive
 );`;
-  }
 }
 
 function generateAlertGroup(groupId: string, groupRules: AlertRule[], programCode: string): string {
@@ -1183,38 +1184,47 @@ function generateAlertGroup(groupId: string, groupRules: AlertRule[], programCod
   const templateLookup = `(SELECT [Id] FROM [dbo].[Template] WHERE [ProgramCode] = ${sqlString(programCode)})`;
   const severityCode = sqlString(first.severityCode);
   const lines: string[] = [`-- Group ${groupId}: ${groupRules.map(r => `${r.code} - ${r.operator} - ${r.value}`).join(" & ")}`];
-
-  let alertLookup: string;
+  const safeGroupId = groupId.replace(/[^A-Za-z0-9]/g, '_');
 
   if (first.prescriptionType === "biometric") {
-    const paramLookup = alertBiometricLookup(first.code, programCode);
-    alertLookup = `(SELECT [Id] FROM [dbo].[TemplateBiometricParameterAlert] WHERE [CodeSeverity] = ${severityCode} AND [TemplateBiometricParameterId] = ${paramLookup})`;
+    const codeSql = sqlString(first.code);
+    const progSql = sqlString(programCode);
+    const tableName = `@Alerts_${safeGroupId}`;
+    
+    lines.push(`DECLARE ${tableName} TABLE (Id UNIQUEIDENTIFIER);`);
     lines.push(`INSERT INTO [dbo].[TemplateBiometricParameterAlert] ([Id] ,[TemplateBiometricParameterId] ,[CodeSeverity] ,[GroupId] ,[Snomed] ,[IsActive] ,[TemplateId])
-VALUES (
+OUTPUT inserted.Id INTO ${tableName}
+SELECT 
     NEWID() --id
-    ,${paramLookup} --templateBiometricParameterId
+    ,[Id] --templateBiometricParameterId
     ,${severityCode} --codeSeverity
     ,NULL --groupId
     ,NULL --snomed
     ,1 --isActive
     ,${templateLookup} --templateId
-);`);
+FROM [dbo].[TemplateBiometricParameter]
+WHERE [Code] = ${codeSql} AND [ProgramCode] = ${progSql};`);
+
+    for (const rule of groupRules) {
+      lines.push(generateAlertItemBiometric(rule, tableName));
+    }
   } else {
+    const varName = `@QAlert_${safeGroupId}`;
     const questionnaireLookup = `(SELECT [Id] FROM [dbo].[TemplateQuestionnaire] WHERE [Code] = ${sqlString(first.questionnaireCode)} AND [TemplateId] = ${templateLookup})`;
-    alertLookup = `(SELECT [Id] FROM [dbo].[TemplateQuestionnaireAlert] WHERE [TemplateQuestionnaireId] = ${questionnaireLookup} AND [CodeSeverity] = ${severityCode})`;
+    
+    lines.push(`DECLARE ${varName} UNIQUEIDENTIFIER = NEWID();`);
     lines.push(`INSERT INTO [dbo].[TemplateQuestionnaireAlert] ([Id] ,[TemplateQuestionnaireId] ,[CodeSeverity] ,[GroupId] ,[IsActive] ,[TemplateId])
 VALUES (
-    NEWID() --id
+    ${varName} --id
     ,${questionnaireLookup} --templateQuestionnaireId
     ,${severityCode} --codeSeverity
     ,NULL --groupId
     ,1 --isActive
     ,${templateLookup} --templateId
 );`);
-  }
-
-  for (const rule of groupRules) {
-    lines.push(generateAlertItem(rule, alertLookup));
+    for (const rule of groupRules) {
+      lines.push(generateAlertItemQuestionnaire(rule, varName));
+    }
   }
 
   return lines.join("\n");
